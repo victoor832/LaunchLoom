@@ -171,10 +171,13 @@ app.get('/api/health', (req: Request, res: Response) => {
   });
 });
 
-// Start server
-app.listen(PORT, '0.0.0.0', () => {
+// Start server with increased timeout for Gemini API calls (which can be slow)
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`📄 PDF API server running on http://0.0.0.0:${PORT}`);
-  console.log(`✨ New flow: Gemini → Word → PDF`);
+  console.log(`✨ New flow: Gemini → PDF (direct generation)`);
   console.log(`POST /api/generate-pdf - Generate playbook (Free returns static, Standard/Pro generates from AI)`);
   console.log(`GET /api/health - Health check`);
 });
+
+// Increase timeout for long-running requests (Gemini API calls can be slow)
+server.setTimeout(120000); // 120 seconds
