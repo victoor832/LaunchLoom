@@ -1,13 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { GoogleGenAI } from '@google/genai';
-import { Document, Packer, Paragraph, Table, TableRow, TableCell, BorderStyle } from 'docx';
-import * as fs from 'fs';
-import * as path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 
-const execAsync = promisify(exec);
-
+// For now, return a placeholder PDF for all tiers
 export default async (req: VercelRequest, res: VercelResponse) => {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -32,44 +25,13 @@ export default async (req: VercelRequest, res: VercelResponse) => {
 
     console.log(`[API] Processing ${tier} tier for: ${productName}`);
 
-    // For now, return a simple success for free tier
-    if (tier === 'free') {
-      // Create a minimal PDF response
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${productName}-playbook-free.pdf"`);
-      
-      // Return empty PDF for free tier (temporary)
-      return res.status(200).send(Buffer.from('%PDF-1.4\n%EOF', 'utf8'));
-    }
+    // TODO: Integrate with Gemini API to generate real content
+    // For now, return a placeholder PDF
 
-    // For standard and pro tiers
-    const apiKey = process.env.VITE_GEMINI_API_KEY || '';
-    
-    if (!apiKey) {
-      return res.status(500).json({ error: 'API key not configured' });
-    }
-
-    console.log(`[API] Calling Gemini API...`);
-    
-    const genAI = new GoogleGenAI({ apiKey });
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
-    const prompt = `Generate a launch playbook for ${productName} targeting ${targetAudience}. Launch date: ${launchDate}. Keep it concise and actionable.`;
-
-    const result = await model.generateContent(prompt);
-    const generatedContent = result.response.text();
-
-    if (!generatedContent || generatedContent.length === 0) {
-      return res.status(500).json({ error: 'Failed to generate content' });
-    }
-
-    console.log(`[API] Generated ${generatedContent.length} characters`);
-
-    // Create a simple text response for now
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${productName}-playbook-${tier}.pdf"`);
     
-    // Return a simple PDF with the content
+    // Return a simple PDF placeholder
     const pdfContent = `%PDF-1.4
 1 0 obj
 << /Type /Catalog /Pages 2 0 R >>
@@ -84,12 +46,19 @@ endobj
 << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >>
 endobj
 5 0 obj
-<< /Length 100 >>
+<< /Length 200 >>
 stream
 BT
-/F1 12 Tf
+/F1 16 Tf
 50 750 Td
-(Launch Playbook) Tj
+(${productName} - Launch Playbook) Tj
+0 -30 Td
+/F1 12 Tf
+(Target: ${targetAudience}) Tj
+0 -20 Td
+(Launch Date: ${launchDate}) Tj
+0 -20 Td
+(Tier: ${tier}) Tj
 ET
 endstream
 endobj
@@ -104,7 +73,7 @@ xref
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-467
+567
 %%EOF`;
 
     return res.status(200).send(Buffer.from(pdfContent, 'utf8'));
