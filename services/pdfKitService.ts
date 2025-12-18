@@ -155,98 +155,53 @@ function parseContentForPDF(content: string) {
     // Try to parse as JSON first
     const json = JSON.parse(content);
     
-    /**
-     * Recursively process JSON object to preserve structure
-     */
-    const processObject = (obj: any, depth = 0) => {
-      if (typeof obj === 'string') {
-        // Simple string - add as content
-        if (obj.trim().length > 0) {
-          sections.push({
-            content: obj.trim(),
-          });
-        }
-      } else if (Array.isArray(obj)) {
-        // Array - convert to numbered list
-        obj.forEach((item, idx) => {
+    // Flatten and process JSON into sections
+    const processValue = (value: any, keyName: string, isTopLevel: boolean): void => {
+      if (keyName && keyName !== 'undefined' && keyName !== 'null') {
+        // Add section title
+        sections.push({
+          title: keyName,
+          isHeading: isTopLevel,
+          isSubheading: !isTopLevel,
+        });
+      }
+
+      if (typeof value === 'string' && value.trim()) {
+        sections.push({ content: value.trim() });
+      } else if (Array.isArray(value)) {
+        // Process array items
+        value.forEach((item) => {
           if (typeof item === 'string') {
-            sections.push({
-              content: `${idx + 1}. ${item}`,
-            });
+            sections.push({ content: `• ${item}` });
           } else if (typeof item === 'object' && item !== null) {
-            // Object in array - extract all string fields
-            const itemTexts: string[] = [];
-            Object.entries(item).forEach(([key, value]) => {
-              if (typeof value === 'string' && value.trim()) {
-                itemTexts.push(`${formatKeyName(key)}: ${value}`);
+            const texts: string[] = [];
+            Object.values(item).forEach((v) => {
+              if (typeof v === 'string' && v.trim()) {
+                texts.push(v);
               }
             });
-            if (itemTexts.length > 0) {
-              sections.push({
-                content: `${idx + 1}. ${itemTexts.join(' | ')}`,
-              });
+            if (texts.length > 0) {
+              sections.push({ content: `• ${texts.join(' — ')}` });
             }
           }
         });
-      } else if (typeof obj === 'object' && obj !== null) {
-        // Object - create hierarchy of sections
-        Object.entries(obj).forEach(([key, value]) => {
-          // Skip empty keys
-          if (!key || key === 'undefined' || key === 'null') return;
-
-          const keyName = formatKeyName(key);
-
-          // Determine heading level based on depth and key length
-          const isMainHeading = depth === 0;
-          
-          // Add section header
-          sections.push({
-            title: keyName,
-            isHeading: isMainHeading,
-            isSubheading: !isMainHeading,
-          });
-
-          // Process the value
-          if (typeof value === 'string') {
-            if (value.trim().length > 0) {
-              sections.push({
-                content: value.trim(),
-              });
-            }
-          } else if (Array.isArray(value)) {
-            // Array content - preserve list structure
-            value.forEach((item, idx) => {
-              if (typeof item === 'string') {
-                sections.push({
-                  content: `• ${item}`,
-                });
-              } else if (typeof item === 'object' && item !== null) {
-                const itemContent = Object.entries(item)
-                  .map(([k, v]) => `${v}`)
-                  .filter(v => v && v.trim().length > 0)
-                  .join(' — ');
-                if (itemContent) {
-                  sections.push({
-                    content: `• ${itemContent}`,
-                  });
-                }
-              }
-            });
-          } else if (typeof value === 'object' && value !== null) {
-            // Nested object - recurse with increased depth
-            processObject(value, depth + 1);
+      } else if (typeof value === 'object' && value !== null) {
+        // Process nested object
+        Object.entries(value).forEach(([k, v]) => {
+          if (k && k !== 'undefined' && k !== 'null') {
+            processValue(v, formatKeyName(k), false);
           }
-
-          // Add spacing after section
-          sections.push({ content: '' });
         });
       }
     };
 
-    processObject(json);
+    // Start processing from top level
+    Object.entries(json).forEach(([key, value]) => {
+      processValue(value, formatKeyName(key), true);
+      sections.push({ content: '' }); // Add spacing
+    });
     
     if (sections.length === 0) {
-      // Fallback: treat content as plain text
       throw new Error('No content extracted from JSON');
     }
   } catch (jsonError) {
