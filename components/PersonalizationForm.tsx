@@ -95,8 +95,11 @@ const PersonalizationForm: React.FC = () => {
         requestBody.mainCompetitor = proData.mainCompetitor || ''; // Can be empty for auto-detection
       }
 
-      const apiBaseUrl = (import.meta as any).env.VITE_API_BASE_URL || 'http://localhost:3000';
-      const apiUrl = apiBaseUrl === '/api' ? '/api/generate-pdf' : `${apiBaseUrl}/api/generate-pdf`;
+      // Determine API URL based on environment
+      const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const apiUrl = isDevelopment ? 'http://localhost:3000/api/generate-pdf' : '/api/generate-pdf';
+      
+      console.log(`[Form] Using API URL: ${apiUrl}`);
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
