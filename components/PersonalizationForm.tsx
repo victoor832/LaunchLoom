@@ -98,12 +98,30 @@ const PersonalizationForm: React.FC = () => {
       // Determine API URL based on environment
       const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       
-      // Use Vercel serverless as primary (better timeout handling than Northflank)
+      // Use Northflank backend directly
       const apiUrl = isDevelopment 
         ? 'http://localhost:3000/api/generate-pdf'
-        : 'https://launch-loom.vercel.app/api/generate-pdf';
+        : 'https://p01--launchloom--4zv2kh7sbk9r.code.run/api/generate-pdf';
       
       console.log(`[Form] Using API URL: ${apiUrl}`);
+      
+      // Try to use cached PDF from localStorage first
+      const cacheKey = `pdf_${input.productName}_${input.tier}`;
+      const cachedPdf = localStorage.getItem(cacheKey);
+      
+      if (cachedPdf) {
+        console.log(`[Form] Using cached PDF from localStorage`);
+        const pdfBlob = new Blob([Buffer.from(cachedPdf, 'base64')], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${data.productName}-launch-playbook-${tierId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        return;
+      }
       
       // Retry logic for timeout issues
       let response;
@@ -150,6 +168,12 @@ const PersonalizationForm: React.FC = () => {
       // Get PDF as blob
       const pdfBlob = await response.blob();
       console.log(`[Form] ✓ PDF received from server: ${pdfBlob.size} bytes`);
+
+      // Save to localStorage for future use
+      const arrayBuffer = await pdfBlob.arrayBuffer();
+      const base64Pdf = Buffer.from(arrayBuffer).toString('base64');
+      localStorage.setItem(cacheKey, base64Pdf);
+      console.log(`[Form] ✓ Cached PDF in localStorage`);
 
       // Download PDF
       const url = window.URL.createObjectURL(pdfBlob);

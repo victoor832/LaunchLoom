@@ -11,10 +11,10 @@ const FreeDownloadPage: React.FC = () => {
       try {
         const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         
-        // Use Vercel serverless as primary (better timeout handling)
+        // Use Northflank backend directly
         const apiUrl = isDevelopment 
           ? 'http://localhost:3000/api/generate-pdf'
-          : 'https://launch-loom.vercel.app/api/generate-pdf';
+          : 'https://p01--launchloom--4zv2kh7sbk9r.code.run/api/generate-pdf';
         
         // Retry logic for timeout issues
         let response;
@@ -49,6 +49,12 @@ const FreeDownloadPage: React.FC = () => {
         if (!response || !response.ok) throw new Error('Failed to download PDF');
 
         const blob = await response.blob();
+        
+        // Cache in localStorage
+        const arrayBuffer = await blob.arrayBuffer();
+        const base64Pdf = Buffer.from(arrayBuffer).toString('base64');
+        localStorage.setItem('pdf_ColdMailAI_free', base64Pdf);
+        
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
