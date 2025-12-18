@@ -120,52 +120,132 @@ export async function generatePDFFromContent(
  */
 function parseContentForPDF(content: string) {
   const sections: PDFSection[] = [];
-  const lines = content.split('\n');
 
-  let currentSection: PDFSection = {};
+  try {
+    // Try to parse as JSON first
+    const json = JSON.parse(content);
+    
+    // Extract all text values from JSON and create sections
+    const extractText = (obj: any, depth = 0): string[] => {
+      const texts: string[] = [];
+      
+      if (typeof obj === 'string') {
+        if (obj.trim().length > 0) {
+          texts.push(obj);
+        }
+      } else if (Array.isArray(obj)) {
+        obj.forEach(item => {
+          if (typeof item === 'string') {
+            texts.push(item);
+          } else if (typeof item === 'object') {
+            if (item.subject || item.title || item.name || item.content || item.body) {
+              const text = item.subject || item.title || item.name || item.content || item.body || '';
+              if (text) texts.push(String(text));
+            }
+            texts.push(...extractText(item, depth + 1));
+          }
+        });
+      } else if (typeof obj === 'object') {
+        Object.keys(obj).forEach(key => {
+          // Use key as section header
+          const value = obj[key];
+          if (key !== 'undefined' && key !== 'null') {
+            const headerText = key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
+            if (headerText.length > 0) {
+              sections.push({
+                title: headerText,
+                isHeading: true,
+              });
+            }
+          }
 
-  lines.forEach((line) => {
-    const trimmed = line.trim();
+          if (typeof value === 'string') {
+            if (value.trim().length > 0) {
+              sections.push({
+                content: value,
+              });
+            }
+          } else if (Array.isArray(value)) {
+            value.forEach((item, idx) => {
+              if (typeof item === 'string') {
+                sections.push({
+                  content: `${idx + 1}. ${item}`,
+                });
+              } else if (typeof item === 'object') {
+                const itemText = Object.values(item)
+                  .filter(v => typeof v === 'string')
+                  .join(' - ');
+                if (itemText) {
+                  sections.push({
+                    content: itemText,
+                  });
+                }
+              }
+            });
+          } else if (typeof value === 'object' && value !== null) {
+            const parsed = parseContentForPDF(JSON.stringify(value));
+            sections.push(...parsed.sections);
+          }
+        });
+      }
+      
+      return texts;
+    };
 
-    if (!trimmed) return;
-
-    // Detect headings (lines with # or ALL CAPS or starting with numbers followed by .)
-    if (trimmed.startsWith('##')) {
-      if (currentSection.title || currentSection.content) {
-        sections.push(currentSection);
-      }
-      currentSection = {
-        title: trimmed.replace(/^#+\s*/, ''),
-        isHeading: true,
-      };
-    } else if (trimmed.match(/^#{1,2}\s/)) {
-      if (currentSection.title || currentSection.content) {
-        sections.push(currentSection);
-      }
-      currentSection = {
-        title: trimmed.replace(/^#+\s*/, ''),
-        isHeading: trimmed.startsWith('##'),
-        isSubheading: !trimmed.startsWith('##'),
-      };
-    } else if (trimmed.match(/^\d+\.\s/) || trimmed.match(/^-\s/)) {
-      // Bullet point or numbered item
-      if (currentSection.content) {
-        currentSection.content += '\n' + trimmed;
-      } else {
-        currentSection.content = trimmed;
-      }
-    } else {
-      // Regular content
-      if (currentSection.content) {
-        currentSection.content += '\n' + trimmed;
-      } else {
-        currentSection.content = trimmed;
-      }
+    extractText(json);
+    
+    if (sections.length === 0) {
+      // Fallback: treat content as plain text
+      throw new Error('No content extracted from JSON');
     }
-  });
+  } catch (jsonError) {
+    // If not JSON, treat as markdown or plain text
+    const lines = content.split('\n');
+    let currentSection: PDFSection = {};
 
-  if (currentSection.title || currentSection.content) {
-    sections.push(currentSection);
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+
+      if (!trimmed) return;
+
+      // Detect headings
+      if (trimmed.startsWith('##')) {
+        if (currentSection.title || currentSection.content) {
+          sections.push(currentSection);
+        }
+        currentSection = {
+          title: trimmed.replace(/^#+\s*/, ''),
+          isHeading: true,
+        };
+      } else if (trimmed.match(/^#{1,2}\s/)) {
+        if (currentSection.title || currentSection.content) {
+          sections.push(currentSection);
+        }
+        currentSection = {
+          title: trimmed.replace(/^#+\s*/, ''),
+          isHeading: trimmed.startsWith('##'),
+          isSubheading: !trimmed.startsWith('##'),
+        };
+      } else if (trimmed.match(/^\d+\.\s/) || trimmed.match(/^-\s/)) {
+        // Bullet point
+        if (currentSection.content) {
+          currentSection.content += '\n' + trimmed;
+        } else {
+          currentSection.content = trimmed;
+        }
+      } else {
+        // Regular content
+        if (currentSection.content) {
+          currentSection.content += '\n' + trimmed;
+        } else {
+          currentSection.content = trimmed;
+        }
+      }
+    });
+
+    if (currentSection.title || currentSection.content) {
+      sections.push(currentSection);
+    }
   }
 
   return { sections };
