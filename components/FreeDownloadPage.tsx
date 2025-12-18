@@ -11,9 +11,9 @@ const FreeDownloadPage: React.FC = () => {
       try {
         const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         
-        // TODO: Reemplaza con tu URL de Railway
-        const railwayApiUrl = 'https://YOUR_RAILWAY_API_URL.railway.app'; // Reemplazar después del deploy
-        const apiUrl = isDevelopment ? 'http://localhost:3000/api/generate-pdf' : `${railwayApiUrl}/api/generate-pdf`;
+        // Northflank URL
+        const northflankApiUrl = 'https://p01--launchloom--4zv2kh7sbk9r.code.run';
+        const apiUrl = isDevelopment ? 'http://localhost:3000/api/generate-pdf' : `${northflankApiUrl}/api/generate-pdf`;
         
         const response = await fetch(apiUrl, {
           method: 'POST',
