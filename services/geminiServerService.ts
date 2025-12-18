@@ -1,10 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
 import { StandardFormData, ProFormData } from '../types';
 
-const apiKey = process.env.VITE_GEMINI_API_KEY || '';
+// En serverless, las variables están sin VITE_
+const apiKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 
 if (!apiKey) {
-  console.warn('⚠️ WARNING: VITE_GEMINI_API_KEY is not set in .env file');
+  console.warn('⚠️ WARNING: GEMINI_API_KEY is not set. Gemini API calls will fail.');
 }
 
 const genAI = new GoogleGenAI({ apiKey });

@@ -47,14 +47,23 @@ export default async (req: VercelRequest, res: VercelResponse) => {
         successMetrics: {}
       });
     } else {
-      // Standard tier: call Gemini
-      const formData: any = {
-        productName,
-        targetAudience,
-        launchDate
-      };
+      // Standard/Pro tier: call Gemini
+      try {
+        const formData: any = {
+          productName,
+          targetAudience,
+          launchDate
+        };
 
-      generatedContent = await generateLaunchPlanServer(formData, tier);
+        generatedContent = await generateLaunchPlanServer(formData, tier);
+      } catch (apiError) {
+        console.error('[API] Gemini API Error:', apiError);
+        throw new Error(`Failed to generate content from Gemini API: ${apiError instanceof Error ? apiError.message : String(apiError)}`);
+      }
+    }
+
+    if (!generatedContent || generatedContent.trim().length === 0) {
+      throw new Error('Gemini API returned empty content');
     }
 
     const contentLength = generatedContent.length;
