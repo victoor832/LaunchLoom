@@ -8,7 +8,7 @@ import { createReadStream, existsSync } from 'fs';
 import { join } from 'path';
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
@@ -156,8 +156,8 @@ app.get('/api/health', (req: Request, res: Response) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`📄 PDF API server running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`📄 PDF API server running on http://0.0.0.0:${PORT}`);
   console.log(`✨ New flow: Gemini → Word → PDF`);
   console.log(`POST /api/generate-pdf - Generate playbook (Free returns static, Standard/Pro generates from AI)`);
   console.log(`GET /api/health - Health check`);
