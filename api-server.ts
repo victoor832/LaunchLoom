@@ -9,6 +9,31 @@ import { join } from 'path';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Simple in-memory cache for generated content (expires after 1 hour)
+const contentCache = new Map<string, { content: string; timestamp: number }>();
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+function getCacheKey(productName: string, targetAudience: string, tier: string): string {
+  return `${productName}|${targetAudience}|${tier}`.toLowerCase();
+}
+
+function getFromCache(key: string): string | null {
+  const cached = contentCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    console.log(`[Cache] Hit for key: ${key}`);
+    return cached.content;
+  }
+  if (cached) {
+    contentCache.delete(key);
+  }
+  return null;
+}
+
+function setCache(key: string, content: string): void {
+  contentCache.set(key, { content, timestamp: Date.now() });
+  console.log(`[Cache] Set for key: ${key}`);
+}
+
 // CORS configuration - must be first middleware
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
@@ -106,18 +131,17 @@ app.post('/api/generate-pdf', async (req: Request, res: Response) => {
     console.log(`[API] Generating PDF for tier: ${input.tier}`);
     console.log(`[API] Product: ${input.productName}, Audience: ${input.targetAudience}`);
 
-    // Send initial response headers to keep connection alive
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${input.productName}-${input.tier}-playbook.pdf"`
-    );
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // Check cache first
+    const cacheKey = getCacheKey(input.productName, input.targetAudience, input.tier);
+    let generatedContent = getFromCache(cacheKey);
 
-    // Step 1: Generate content with Gemini AI
-    console.log(`[API] Step 1: Calling Gemini API...`);
-    const generatedContent = await generateLaunchPlanServer(
-      {
+    if (!generatedContent) {
+      // Step 1: Generate content with Gemini AI
+      console.log(`[API] Step 1: Calling Gemini API...`);
+      const startTime = Date.now();
+      
+      generatedContent = await generateLaunchPlanServer(
+        {
         productName: input.productName,
         targetAudience: input.targetAudience,
         launchDate: input.launchDate,
@@ -132,15 +156,22 @@ app.post('/api/generate-pdf', async (req: Request, res: Response) => {
         }),
       } as any,
       input.tier as 'standard' | 'pro'
-    );
+      );
 
-    if (!generatedContent || generatedContent.trim().length === 0) {
-      throw new Error('Gemini API returned empty content');
+      const geminiTime = Date.now() - startTime;
+      console.log(`[API] Step 1 Complete: Generated ${generatedContent.length} characters in ${geminiTime}ms`);
+
+      if (!generatedContent || generatedContent.trim().length === 0) {
+        throw new Error('Gemini API returned empty content');
+      }
+
+      // Cache the result
+      setCache(cacheKey, generatedContent);
+    } else {
+      console.log(`[API] Step 1: Using cached content (${generatedContent.length} characters)`);
     }
 
-    console.log(`[API] Step 1 Complete: Generated ${generatedContent.length} characters`);
-
-    // Step 2: Generate PDF directly from content (no Word intermediate step)
+    // Step 2: Generate PDF directly from content
     console.log(`[API] Step 2: Generating PDF from content...`);
     const pdfBuffer = await generatePDFFromContent(input.productName, generatedContent, input.tier);
     console.log(`[API] Step 2 Complete: PDF created (${pdfBuffer.length} bytes)`);
