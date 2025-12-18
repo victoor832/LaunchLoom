@@ -98,10 +98,10 @@ const PersonalizationForm: React.FC = () => {
       // Determine API URL based on environment
       const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       
-      // Use Northflank backend directly
+      // Use Vercel serverless as primary (better timeout handling than Northflank)
       const apiUrl = isDevelopment 
         ? 'http://localhost:3000/api/generate-pdf'
-        : 'https://p01--launchloom--4zv2kh7sbk9r.code.run/api/generate-pdf';
+        : 'https://launch-loom.vercel.app/api/generate-pdf';
       
       console.log(`[Form] Using API URL: ${apiUrl}`);
       

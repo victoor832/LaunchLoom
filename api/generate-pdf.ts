@@ -4,7 +4,7 @@ import { generatePDFFromContent } from '../services/pdfKitService';
 
 /**
  * Vercel serverless endpoint for PDF generation
- * Uses imported services from the main app
+ * This runs the full generation pipeline without timeout constraints
  */
 export default async (req: VercelRequest, res: VercelResponse) => {
   // Enable CORS
@@ -56,9 +56,10 @@ export default async (req: VercelRequest, res: VercelResponse) => {
 
     // For Standard and Pro tiers, generate with AI
     console.log(`[Vercel API] Generating PDF for tier: ${input.tier}`);
+    console.log(`[Vercel API] Product: ${input.productName}, Audience: ${input.targetAudience}`);
 
     // Step 1: Generate content with Gemini AI
-    console.log(`[Vercel API] Calling Gemini API...`);
+    console.log(`[Vercel API] Step 1: Calling Gemini API...`);
     const startTime = Date.now();
     
     const generatedContent = await generateLaunchPlanServer(
