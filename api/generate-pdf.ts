@@ -1,9 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { generateLaunchPlanServer } from '../services/geminiServerService';
-import { generateWordDocument, WordDocumentInput } from '../services/wordGeneratorService';
-import { convertWordToPDF } from '../services/pdfConverterService';
+import https from 'https';
 
 export default async (req: VercelRequest, res: VercelResponse) => {
   // Enable CORS
@@ -20,7 +18,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
   }
 
   try {
-    const { productName, targetAudience, launchDate, tier, daysToLaunch, productDescription, currentTraction, budget, selectedChannels, hasProductHuntExperience, mainCompetitor } = req.body;
+    const { productName, targetAudience, launchDate, tier } = req.body;
 
     // Validate required fields
     if (!productName || !targetAudience || !launchDate || !tier) {
@@ -29,80 +27,80 @@ export default async (req: VercelRequest, res: VercelResponse) => {
 
     console.log(`[API] Processing ${tier} tier for: ${productName}`);
 
-    // For free tier, serve static PDF
+    // For free tier, download from GitHub
     if (tier === 'free') {
       try {
-        const pdfPath = join(process.cwd(), 'public', 'reports', 'ColdMailAI-free-plan.pdf');
-        const pdfBuffer = readFileSync(pdfPath);
+        console.log('[API] Downloading free tier PDF from GitHub...');
         
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${productName}-free-plan.pdf"`);
-        return res.status(200).send(pdfBuffer);
+        const githubUrl = 'https://raw.githubusercontent.com/victoor832/LaunchLoom/main/public/reports/ColdMailAI-free-plan.pdf';
+        
+        return new Promise((resolve) => {
+          https.get(githubUrl, (response) => {
+            if (response.statusCode !== 200) {
+              console.error('[API] GitHub returned status:', response.statusCode);
+              res.status(500).json({ error: 'Failed to download free plan PDF' });
+              resolve(undefined);
+              return;
+            }
+
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${productName}-free-plan.pdf"`);
+            response.pipe(res);
+          }).on('error', (error) => {
+            console.error('[API] GitHub download error:', error);
+            res.status(500).json({ error: 'Failed to download free plan PDF' });
+            resolve(undefined);
+          });
+        });
       } catch (error) {
-        console.error('[API] Error reading static PDF:', error);
+        console.error('[API] Error downloading PDF:', error);
         return res.status(500).json({ error: 'Failed to serve free plan PDF' });
       }
     }
 
-    // For standard and pro tiers, generate with AI
-    console.log(`[API] Generating content for ${tier} tier...`);
+    // For standard and pro tiers, return placeholder for now
+    console.log('[API] Standard/Pro tier - placeholder response');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${productName}-playbook-${tier}.pdf"`);
+    
+    const pdfContent = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /Resources 4 0 R /MediaBox [0 0 612 792] /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >>
+endobj
+5 0 obj
+<< /Length 100 >>
+stream
+BT
+/F1 12 Tf
+50 750 Td
+(Playbook - Coming Soon) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f
+0000000009 00000 n
+0000000058 00000 n
+0000000115 00000 n
+0000000214 00000 n
+0000000317 00000 n
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+467
+%%EOF`;
 
-    try {
-      // Build form data for Gemini
-      const formData: any = {
-        productName,
-        targetAudience,
-        launchDate,
-      };
-
-      // Add Pro+ fields if applicable
-      if (tier === 'pro') {
-        formData.productDescription = productDescription;
-        formData.currentTraction = currentTraction;
-        formData.budget = budget;
-        formData.selectedChannels = selectedChannels;
-        formData.hasProductHuntExperience = hasProductHuntExperience;
-        formData.mainCompetitor = mainCompetitor;
-      }
-
-      // Step 1: Generate content with Gemini
-      console.log(`[API] Step 1: Calling Gemini API...`);
-      const generatedContent = await generateLaunchPlanServer(formData, tier as 'standard' | 'pro');
-
-      if (!generatedContent || generatedContent.trim().length === 0) {
-        throw new Error('Gemini API returned empty content');
-      }
-
-      console.log(`[API] Step 1 Complete: Generated ${generatedContent.length} characters`);
-
-      // Step 2: Create Word document
-      console.log(`[API] Step 2: Creating Word document...`);
-      const wordInput: WordDocumentInput = {
-        productName,
-        targetAudience,
-        launchDate,
-        tier: tier as 'free' | 'standard' | 'pro',
-        daysToLaunch: daysToLaunch || 0,
-        generatedContent,
-      };
-
-      const wordBuffer = await generateWordDocument(wordInput);
-      console.log(`[API] Step 2 Complete: Word document created (${wordBuffer.length} bytes)`);
-
-      // Step 3: Convert to PDF
-      console.log(`[API] Step 3: Converting Word to PDF...`);
-      const pdfBuffer = await convertWordToPDF(wordBuffer);
-      console.log(`[API] Step 3 Complete: PDF created (${pdfBuffer.length} bytes)`);
-
-      // Send PDF to client
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${productName}-launch-playbook-${tier}.pdf"`);
-      return res.status(200).send(pdfBuffer);
-
-    } catch (error) {
-      console.error('[API] Generation Error:', error);
-      throw error;
-    }
+    return res.status(200).send(Buffer.from(pdfContent, 'utf8'));
 
   } catch (error) {
     console.error('[API] Error:', error);
