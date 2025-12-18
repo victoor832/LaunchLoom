@@ -50,10 +50,19 @@ const FreeDownloadPage: React.FC = () => {
 
         const blob = await response.blob();
         
-        // Cache in localStorage
-        const arrayBuffer = await blob.arrayBuffer();
-        const base64Pdf = Buffer.from(arrayBuffer).toString('base64');
-        localStorage.setItem('pdf_ColdMailAI_free', base64Pdf);
+        // Cache in localStorage (convert blob to base64 without Buffer)
+        try {
+          const arrayBuffer = await blob.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const base64Pdf = btoa(binary);
+          localStorage.setItem('pdf_ColdMailAI_free', base64Pdf);
+        } catch (cacheError) {
+          console.warn('Could not cache PDF:', cacheError);
+        }
         
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');

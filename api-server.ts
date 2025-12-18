@@ -43,11 +43,22 @@ const corsOptions = {
   methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: false,
-  maxAge: 3600,
+  maxAge: 86400,
   preflightContinue: false
 };
 
 app.use(cors(corsOptions));
+
+// Explicit CORS headers for all responses (backup for cors middleware)
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 // Additional CORS headers as fallback
 app.use((req, res, next) => {

@@ -111,7 +111,13 @@ const PersonalizationForm: React.FC = () => {
       
       if (cachedPdf) {
         console.log(`[Form] Using cached PDF from localStorage`);
-        const pdfBlob = new Blob([Buffer.from(cachedPdf, 'base64')], { type: 'application/pdf' });
+        // Decode base64 to binary string, then to bytes
+        const binaryString = atob(cachedPdf);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const pdfBlob = new Blob([bytes], { type: 'application/pdf' });
         const url = window.URL.createObjectURL(pdfBlob);
         const link = document.createElement('a');
         link.href = url;
@@ -169,11 +175,21 @@ const PersonalizationForm: React.FC = () => {
       const pdfBlob = await response.blob();
       console.log(`[Form] ✓ PDF received from server: ${pdfBlob.size} bytes`);
 
-      // Save to localStorage for future use
-      const arrayBuffer = await pdfBlob.arrayBuffer();
-      const base64Pdf = Buffer.from(arrayBuffer).toString('base64');
-      localStorage.setItem(cacheKey, base64Pdf);
-      console.log(`[Form] ✓ Cached PDF in localStorage`);
+      // Save to localStorage for future use (convert blob to base64 without Buffer)
+      try {
+        const arrayBuffer = await pdfBlob.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64Pdf = btoa(binary);
+        localStorage.setItem(cacheKey, base64Pdf);
+        console.log(`[Form] ✓ Cached PDF in localStorage`);
+      } catch (cacheError) {
+        console.warn(`[Form] Could not cache PDF:`, cacheError);
+        // Continue even if caching fails - PDF is still being downloaded
+      }
 
       // Download PDF
       const url = window.URL.createObjectURL(pdfBlob);
