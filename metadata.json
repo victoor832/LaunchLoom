@@ -1,0 +1,5 @@
+{
+  "name": "LaunchLoom",
+  "description": "A 3-tier SaaS pricing model demonstration app that generates personalized launch checklists using Gemini AI.",
+  "requestFramePermissions": []
+}

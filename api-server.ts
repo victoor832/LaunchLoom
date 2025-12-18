@@ -1,0 +1,164 @@
+import 'dotenv/config';
+import express, { Request, Response } from 'express';
+import { generateLaunchPlanServer } from './services/geminiServerService';
+import { generateWordDocument, WordDocumentInput } from './services/wordGeneratorService';
+import { convertWordToPDF } from './services/pdfConverterService';
+import cors from 'cors';
+import { createReadStream, existsSync } from 'fs';
+import { join } from 'path';
+
+const app = express();
+const PORT = 3000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+/**
+ * POST /api/generate-pdf
+ * New flow: AI Content → Word Document → PDF
+ *
+ * Body:
+ * {
+ *   productName: string
+ *   targetAudience: string
+ *   launchDate: string
+ *   tier: 'free' | 'standard' | 'pro'
+ *   daysToLaunch: number
+ * }
+ */
+app.post('/api/generate-pdf', async (req: Request, res: Response) => {
+  try {
+    const input = req.body;
+
+    // Validate input
+    if (!input.productName || !input.targetAudience || !input.launchDate || !input.tier) {
+      return res.status(400).json({
+        error: 'Missing required fields: productName, targetAudience, launchDate, tier',
+      });
+    }
+
+    if (!['free', 'standard', 'pro'].includes(input.tier)) {
+      return res.status(400).json({ error: 'Invalid tier. Must be free, standard, or pro.' });
+    }
+
+    // Validate launch date is in the future
+    const launchDate = new Date(input.launchDate);
+    const today = new Date();
+    const daysToLaunch = Math.ceil((launchDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysToLaunch <= 0) {
+      return res.status(400).json({
+        error: `Tu fecha de lanzamiento ya pasó (${launchDate.toLocaleDateString()}). Este playbook te sirve para análisis post-launch o recalcula una fecha futura.`,
+      });
+    }
+
+    // Set response headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${input.productName}-${input.tier}-playbook.pdf"`
+    );
+
+    // For Free tier, serve static PDF
+    if (input.tier === 'free') {
+      const staticPdfPath = join(process.cwd(), 'public', 'reports', 'ColdMailAI-free-plan.pdf');
+      
+      if (!existsSync(staticPdfPath)) {
+        return res.status(404).json({ error: 'Free tier PDF not found' });
+      }
+
+      const fileStream = createReadStream(staticPdfPath);
+      fileStream.pipe(res);
+      
+      fileStream.on('error', (error: Error) => {
+        console.error('File streaming error:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Failed to serve PDF' });
+        }
+      });
+      
+      return;
+    }
+
+    // For Standard and Pro tiers, generate with new flow
+    console.log(`[API] Generating PDF for tier: ${input.tier}`);
+    console.log(`[API] Product: ${input.productName}, Audience: ${input.targetAudience}`);
+
+    // Step 1: Generate content with Gemini AI
+    console.log(`[API] Step 1: Calling Gemini API...`);
+    const generatedContent = await generateLaunchPlanServer(
+      {
+        productName: input.productName,
+        targetAudience: input.targetAudience,
+        launchDate: input.launchDate,
+        // Add Pro+ fields if present
+        ...(input.tier === 'pro' && {
+          productDescription: input.productDescription,
+          currentTraction: input.currentTraction,
+          budget: input.budget,
+          selectedChannels: input.selectedChannels,
+          hasProductHuntExperience: input.hasProductHuntExperience,
+          mainCompetitor: input.mainCompetitor,
+        }),
+      } as any,
+      input.tier as 'standard' | 'pro'
+    );
+
+    if (!generatedContent || generatedContent.trim().length === 0) {
+      throw new Error('Gemini API returned empty content');
+    }
+
+    console.log(`[API] Step 1 Complete: Generated ${generatedContent.length} characters`);
+
+    // Step 2: Create Word document
+    console.log(`[API] Step 2: Creating Word document...`);
+    const wordInput: WordDocumentInput = {
+      productName: input.productName,
+      targetAudience: input.targetAudience,
+      launchDate: input.launchDate,
+      tier: input.tier,
+      daysToLaunch: input.daysToLaunch,
+      generatedContent: generatedContent,
+    };
+
+    const wordBuffer = await generateWordDocument(wordInput);
+    console.log(`[API] Step 2 Complete: Word document created (${wordBuffer.length} bytes)`);
+
+    // Step 3: Convert Word to PDF
+    console.log(`[API] Step 3: Converting Word to PDF...`);
+    const pdfBuffer = await convertWordToPDF(wordBuffer);
+    console.log(`[API] Step 3 Complete: PDF created (${pdfBuffer.length} bytes)`);
+
+    // Send PDF to client
+    console.log(`[API] Sending PDF to client...`);
+    res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error('[API] Error:', error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        error: 'Failed to generate PDF',
+        details: errorMsg 
+      });
+    }
+  }
+});
+
+/**
+ * GET /api/health
+ * Health check endpoint
+ */
+app.get('/api/health', (req: Request, res: Response) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`📄 PDF API server running on http://localhost:${PORT}`);
+  console.log(`✨ New flow: Gemini → Word → PDF`);
+  console.log(`POST /api/generate-pdf - Generate playbook (Free returns static, Standard/Pro generates from AI)`);
+  console.log(`GET /api/health - Health check`);
+});

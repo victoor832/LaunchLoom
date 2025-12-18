@@ -1,0 +1,11 @@
+{
+  "buildCommand": "pnpm build",
+  "installCommand": "pnpm install",
+  "framework": "vite",
+  "env": {
+    "SKIP_ENV_VALIDATION": "false"
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
