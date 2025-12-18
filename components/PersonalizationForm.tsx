@@ -98,9 +98,10 @@ const PersonalizationForm: React.FC = () => {
       // Determine API URL based on environment
       const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       
-      // Northflank URL
-      const northflankApiUrl = 'https://p01--launchloom--4zv2kh7sbk9r.code.run';
-      const apiUrl = isDevelopment ? 'http://localhost:3000/api/generate-pdf' : `${northflankApiUrl}/api/generate-pdf`;
+      // Use Northflank backend directly
+      const apiUrl = isDevelopment 
+        ? 'http://localhost:3000/api/generate-pdf'
+        : 'https://p01--launchloom--4zv2kh7sbk9r.code.run/api/generate-pdf';
       
       console.log(`[Form] Using API URL: ${apiUrl}`);
       const response = await fetch(apiUrl, {

@@ -1,120 +1,15 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import https from 'https';
+import { generateLaunchPlanServer } from '../services/geminiServerService';
+import { generatePDFFromContent } from '../services/pdfKitService';
 
-// Helper function to call Gemini API
-async function callGeminiAPI(prompt: string, apiKey: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const data = JSON.stringify({
-      contents: [{
-        parts: [{
-          text: prompt
-        }]
-      }]
-    });
-
-    const options = {
-      hostname: 'generativelanguage.googleapis.com',
-      path: `/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': data.length
-      }
-    };
-
-    const req = https.request(options, (res) => {
-      let responseData = '';
-      res.on('data', (chunk) => {
-        responseData += chunk;
-      });
-      res.on('end', () => {
-        try {
-          console.log('[API] Gemini response received, parsing...');
-          const parsed = JSON.parse(responseData);
-          
-          // Log the response structure for debugging
-          console.log('[API] Response structure:', {
-            hasError: parsed.error ? true : false,
-            hasCandidates: parsed.candidates ? true : false,
-            candidatesLength: parsed.candidates?.length || 0
-          });
-
-          if (parsed.error) {
-            reject(new Error(`Gemini API error: ${parsed.error.message}`));
-            return;
-          }
-
-          if (parsed.candidates && parsed.candidates.length > 0) {
-            const content = parsed.candidates[0]?.content?.parts?.[0]?.text;
-            if (content) {
-              console.log('[API] Content extracted successfully');
-              resolve(content);
-              return;
-            }
-          }
-
-          reject(new Error(`No content in Gemini response: ${JSON.stringify(parsed).substring(0, 200)}`));
-        } catch (e) {
-          reject(new Error(`Failed to parse Gemini response: ${responseData.substring(0, 200)}`));
-        }
-      });
-    });
-
-    req.on('error', reject);
-    req.write(data);
-    req.end();
-  });
-}
-
-// Helper function to create a simple PDF from text content
-function createPDFFromContent(title: string, content: string): Buffer {
-  // Simple PDF structure
-  let pdf = '%PDF-1.4\n';
-  
-  // Object 1: Catalog
-  const obj1 = '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n';
-  
-  // Object 2: Pages
-  const obj2 = '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n';
-  
-  // Object 3: Page
-  const obj3 = '3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources 4 0 R /MediaBox [0 0 612 792] /Contents 5 0 R >>\nendobj\n';
-  
-  // Object 4: Resources
-  const obj4 = '4 0 obj\n<< /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >>\nendobj\n';
-  
-  // Object 5: Content stream
-  let stream = 'BT\n/F1 16 Tf\n50 750 Td\n';
-  stream += `(${title.replace(/[()]/g, '\\$&')}) Tj\n`;
-  stream += '0 -30 Td\n';
-  stream += '/F1 10 Tf\n';
-  
-  // Add content lines
-  const lines = content.split('\n').slice(0, 30); // Limit to first 30 lines
-  for (const line of lines) {
-    if (line.trim()) {
-      stream += `(${line.replace(/[()]/g, '\\$&')}) Tj\n`;
-      stream += '0 -15 Td\n';
-    }
-  }
-  stream += 'ET\n';
-  
-  const obj5 = `5 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}endstream\nendobj\n`;
-  
-  // Build xref
-  const xrefStart = (obj1 + obj2 + obj3 + obj4 + obj5).length + pdf.length;
-  const xref = `xref\n0 6\n0000000000 65535 f\n${String(obj1.length + pdf.length).padStart(10, '0')} 00000 n\n${String(obj1.length + obj2.length + pdf.length).padStart(10, '0')} 00000 n\n${String(obj1.length + obj2.length + obj3.length + pdf.length).padStart(10, '0')} 00000 n\n${String(obj1.length + obj2.length + obj3.length + obj4.length + pdf.length).padStart(10, '0')} 00000 n\n${String(obj1.length + obj2.length + obj3.length + obj4.length + obj5.length + pdf.length).padStart(10, '0')} 00000 n\n`;
-  
-  const trailer = `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefStart + obj1.length + obj2.length + obj3.length + obj4.length}\n%%EOF`;
-  
-  const fullPDF = pdf + obj1 + obj2 + obj3 + obj4 + obj5 + xref + trailer;
-  return Buffer.from(fullPDF, 'utf8');
-}
-
+/**
+ * Vercel serverless endpoint for PDF generation
+ * Uses imported services from the main app
+ */
 export default async (req: VercelRequest, res: VercelResponse) => {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -126,89 +21,86 @@ export default async (req: VercelRequest, res: VercelResponse) => {
   }
 
   try {
-    const { productName, targetAudience, launchDate, tier } = req.body;
+    const input = req.body;
 
-    // Validate required fields
-    if (!productName || !targetAudience || !launchDate || !tier) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    console.log(`[API] Processing ${tier} tier for: ${productName}`);
-
-    // For free tier, download from GitHub
-    if (tier === 'free') {
-      try {
-        console.log('[API] Downloading free tier PDF from GitHub...');
-        
-        const githubUrl = 'https://raw.githubusercontent.com/victoor832/LaunchLoom/main/public/reports/ColdMailAI-free-plan.pdf';
-        
-        return new Promise((resolve) => {
-          https.get(githubUrl, (response) => {
-            if (response.statusCode !== 200) {
-              console.error('[API] GitHub returned status:', response.statusCode);
-              res.status(500).json({ error: 'Failed to download free plan PDF' });
-              resolve(undefined);
-              return;
-            }
-
-            res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename="${productName}-free-plan.pdf"`);
-            response.pipe(res);
-          }).on('error', (error) => {
-            console.error('[API] GitHub download error:', error);
-            res.status(500).json({ error: 'Failed to download free plan PDF' });
-            resolve(undefined);
-          });
-        });
-      } catch (error) {
-        console.error('[API] Error downloading PDF:', error);
-        return res.status(500).json({ error: 'Failed to serve free plan PDF' });
-      }
-    }
-
-    // For standard and pro tiers, generate with Gemini
-    try {
-      const apiKey = process.env.VITE_GEMINI_API_KEY || '';
-      
-      if (!apiKey) {
-        console.error('[API] VITE_GEMINI_API_KEY not configured');
-        return res.status(500).json({ error: 'API key not configured' });
-      }
-
-      console.log(`[API] Calling Gemini API for ${tier} tier...`);
-
-      const prompt = `Create a concise launch playbook for "${productName}" targeting ${targetAudience} launching on ${launchDate}. 
-
-Provide key sections:
-1. Pre-Launch (2 weeks before)
-2. Launch Day
-3. Post-Launch (first week)
-
-For each section, list specific actionable tasks. Keep it brief and practical.`;
-
-      const content = await callGeminiAPI(prompt, apiKey);
-      console.log(`[API] Generated ${content.length} characters from Gemini`);
-
-      // Create PDF from generated content
-      const pdfBuffer = createPDFFromContent(`Launch Playbook: ${productName}`, content);
-
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${productName}-launch-playbook-${tier}.pdf"`);
-      return res.status(200).send(pdfBuffer);
-
-    } catch (error) {
-      console.error('[API] Gemini Error:', error);
-      return res.status(500).json({ 
-        error: 'Failed to generate PDF',
-        details: error instanceof Error ? error.message : String(error)
+    // Validate input
+    if (!input.productName || !input.targetAudience || !input.launchDate || !input.tier) {
+      return res.status(400).json({
+        error: 'Missing required fields: productName, targetAudience, launchDate, tier',
       });
     }
 
+    // Set response headers for PDF
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${input.productName}-${input.tier}-playbook.pdf"`
+    );
+
+    // For Free tier, serve static PDF
+    if (input.tier === 'free') {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const staticPdfPath = path.join(process.cwd(), 'public', 'reports', 'ColdMailAI-free-plan.pdf');
+        
+        if (fs.existsSync(staticPdfPath)) {
+          const pdfBuffer = fs.readFileSync(staticPdfPath);
+          return res.status(200).send(pdfBuffer);
+        }
+      } catch (error) {
+        console.error('Error reading static PDF:', error);
+      }
+      return res.status(404).json({ error: 'Free tier PDF not found' });
+    }
+
+    // For Standard and Pro tiers, generate with AI
+    console.log(`[Vercel API] Generating PDF for tier: ${input.tier}`);
+
+    // Step 1: Generate content with Gemini AI
+    console.log(`[Vercel API] Calling Gemini API...`);
+    const startTime = Date.now();
+    
+    const generatedContent = await generateLaunchPlanServer(
+      {
+        productName: input.productName,
+        targetAudience: input.targetAudience,
+        launchDate: input.launchDate,
+        ...(input.tier === 'pro' && {
+          productDescription: input.productDescription,
+          currentTraction: input.currentTraction,
+          budget: input.budget,
+          selectedChannels: input.selectedChannels,
+          hasProductHuntExperience: input.hasProductHuntExperience,
+          mainCompetitor: input.mainCompetitor,
+        }),
+      } as any,
+      input.tier as 'standard' | 'pro'
+    );
+
+    const geminiTime = Date.now() - startTime;
+    console.log(`[Vercel API] Gemini completed in ${geminiTime}ms, generated ${generatedContent.length} chars`);
+
+    if (!generatedContent || generatedContent.trim().length === 0) {
+      throw new Error('Gemini API returned empty content');
+    }
+
+    // Step 2: Generate PDF
+    console.log(`[Vercel API] Generating PDF...`);
+    const pdfBuffer = await generatePDFFromContent(input.productName, generatedContent, input.tier);
+    console.log(`[Vercel API] PDF created (${pdfBuffer.length} bytes)`);
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    return res.status(200).send(pdfBuffer);
+
   } catch (error) {
-    console.error('[API] Error:', error);
-    return res.status(500).json({ 
+    console.error('[Vercel API] Error:', error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    return res.status(500).json({
       error: 'Failed to generate PDF',
-      details: error instanceof Error ? error.message : String(error)
+      details: errorMsg,
     });
   }
 };

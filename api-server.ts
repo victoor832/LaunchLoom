@@ -106,6 +106,14 @@ app.post('/api/generate-pdf', async (req: Request, res: Response) => {
     console.log(`[API] Generating PDF for tier: ${input.tier}`);
     console.log(`[API] Product: ${input.productName}, Audience: ${input.targetAudience}`);
 
+    // Send initial response headers to keep connection alive
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${input.productName}-${input.tier}-playbook.pdf"`
+    );
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
     // Step 1: Generate content with Gemini AI
     console.log(`[API] Step 1: Calling Gemini API...`);
     const generatedContent = await generateLaunchPlanServer(
