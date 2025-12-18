@@ -33,33 +33,45 @@ export const generateLaunchPlanServer = async (
     : '';
 
   const prompt = isPro 
-    ? `You are a launch strategist. Generate a PRO+ launch playbook in JSON format.
+    ? `You are a world-class SaaS launch strategist. Generate a PRO+ TIER launch playbook in VALID JSON format.
 
-PRODUCT: ${formData.productName} | AUDIENCE: ${formData.targetAudience} | DAYS: ${daysUntilLaunch} | BUDGET: ${proData?.budget}
-CHANNELS: ${channels}
+PRODUCT INFORMATION:
+- Name: ${formData.productName}
+- Target Audience: ${formData.targetAudience}
+- Days Until Launch: ${daysUntilLaunch}
+- Budget: ${proData?.budget}
+- Channels: ${channels}
+- Competitor: ${proData?.mainCompetitor || 'auto-detect'}
 
-Generate JSON with these EXACT keys:
-{
-  "executiveSummary": "...",
-  "emailSequences": ["..."],
-  "twitterPosts": ["..."],
-  "linkedinPosts": ["..."],
-  "timeline": ["..."],
-  "successMetrics": "..."
-}`
-    : `You are a launch strategist. Generate a STANDARD launch playbook in JSON format.
+Generate comprehensive PRO+ content:
+- Executive Summary (tailored to their market position)
+- Competitor Analysis
+- Budget Breakdown
+- 12 personalized email sequences
+- 30 Twitter posts optimized for ${channels}
+- 10 LinkedIn posts
+- Product Hunt strategy
+- 30-day daily timeline
+- Success metrics
 
-PRODUCT: ${formData.productName} | AUDIENCE: ${formData.targetAudience} | DAYS: ${daysUntilLaunch}
+Return ONLY valid JSON with ALL fields populated. No markdown, no explanation.`
+    : `You are a professional SaaS launch strategist. Generate a STANDARD TIER launch playbook in VALID JSON format.
 
-Generate JSON with these EXACT keys:
-{
-  "summary": "...",
-  "strategy": "...",
-  "emails": ["...", "..."],
-  "posts": ["...", "..."],
-  "timeline": ["day 1: ...", "day 2: ..."],
-  "metrics": "..."
-}`;
+PRODUCT INFORMATION:
+- Name: ${formData.productName}
+- Target Audience: ${formData.targetAudience}
+- Days Until Launch: ${daysUntilLaunch}
+
+Generate comprehensive STANDARD content:
+- Executive Summary
+- Go-to-Market Strategy (top 3 channels)
+- 10 email templates (copy/paste ready)
+- 25 Twitter posts (full month coverage)
+- 8 LinkedIn posts (professional)
+- 7-day action timeline
+- Success metrics
+
+Return ONLY valid JSON with ALL fields populated. No markdown, no explanation.`;
 
   try {
     console.log('[Gemini] Generating launch plan...');

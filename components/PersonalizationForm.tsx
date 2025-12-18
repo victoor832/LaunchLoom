@@ -104,15 +104,47 @@ const PersonalizationForm: React.FC = () => {
         : 'https://p01--launchloom--4zv2kh7sbk9r.code.run/api/generate-pdf';
       
       console.log(`[Form] Using API URL: ${apiUrl}`);
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      });
+      
+      // Retry logic for timeout issues
+      let response;
+      let retries = 0;
+      const maxRetries = 3;
+      const retryDelay = 2000; // 2 seconds
+      
+      while (retries < maxRetries) {
+        try {
+          response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+            signal: AbortSignal.timeout(90000), // 90 second timeout
+          });
+          
+          if (response.ok) {
+            break; // Success, exit retry loop
+          }
+          
+          retries++;
+          if (retries < maxRetries) {
+            console.log(`[Form] Request failed, retrying in ${retryDelay}ms... (attempt ${retries + 1}/${maxRetries})`);
+            setGenerationProgress(`Reintentando... (${retries}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+          }
+        } catch (error) {
+          retries++;
+          if (retries < maxRetries) {
+            console.log(`[Form] Request error, retrying in ${retryDelay}ms...`, error);
+            setGenerationProgress(`Reintentando... (${retries}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+          } else {
+            throw error;
+          }
+        }
+      }
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `API error: ${response.statusText}`);
+      if (!response || !response.ok) {
+        const errorData = await response?.json().catch(() => ({}));
+        throw new Error(errorData?.message || `API error: ${response?.statusText || 'Unknown error'}`);
       }
 
       // Get PDF as blob

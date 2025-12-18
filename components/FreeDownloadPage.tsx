@@ -16,19 +16,37 @@ const FreeDownloadPage: React.FC = () => {
           ? 'http://localhost:3000/api/generate-pdf'
           : 'https://p01--launchloom--4zv2kh7sbk9r.code.run/api/generate-pdf';
         
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            productName: 'ColdMailAI',
-            targetAudience: 'Sales Teams',
-            launchDate: new Date().toISOString().split('T')[0],
-            tier: 'free',
-            daysToLaunch: 30
-          })
-        });
+        // Retry logic for timeout issues
+        let response;
+        let retries = 0;
+        const maxRetries = 3;
+        
+        while (retries < maxRetries) {
+          try {
+            response = await fetch(apiUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                productName: 'ColdMailAI',
+                targetAudience: 'Sales Teams',
+                launchDate: new Date().toISOString().split('T')[0],
+                tier: 'free',
+                daysToLaunch: 30
+              }),
+              signal: AbortSignal.timeout(90000),
+            });
+            
+            if (response.ok) break;
+            retries++;
+            if (retries < maxRetries) await new Promise(r => setTimeout(r, 2000));
+          } catch (error) {
+            retries++;
+            if (retries < maxRetries) await new Promise(r => setTimeout(r, 2000));
+            else throw error;
+          }
+        }
 
-        if (!response.ok) throw new Error('Failed to download PDF');
+        if (!response || !response.ok) throw new Error('Failed to download PDF');
 
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
