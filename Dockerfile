@@ -2,6 +2,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Instalar LibreOffice y dependencias
+RUN apk add --no-cache \
+    libreoffice \
+    libreoffice-headless \
+    libreoffice-impress \
+    libreoffice-calc \
+    libreoffice-writer
+
 # Instalar pnpm
 RUN npm install -g pnpm
 
