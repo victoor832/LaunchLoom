@@ -62,8 +62,11 @@ export async function generatePDFFromContent(
 
         // Add sections
         parsed.sections.forEach((section, index) => {
+          // Skip empty sections
+          if (!section.title && !section.content) return;
+
           // Check if we need a page break
-          if (doc.y > doc.page.height - 100) {
+          if (doc.y > doc.page.height - 80) {
             doc.addPage();
             pageNum++;
             doc.fontSize(10).fillColor('#999999').text(`Page ${pageNum}`, { align: 'right' });
@@ -71,27 +74,42 @@ export async function generatePDFFromContent(
           }
 
           if (section.isHeading) {
+            // Main heading
             doc
               .fontSize(16)
               .font('Helvetica-Bold')
               .fillColor('#0066CC')
               .text(section.title, { underline: true })
-              .moveDown(0.3)
+              .moveDown(0.4)
               .fillColor('black')
               .font('Helvetica');
           } else if (section.isSubheading) {
+            // Subheading
             doc
               .fontSize(13)
               .font('Helvetica-Bold')
+              .fillColor('#333333')
               .text(section.title)
-              .moveDown(0.2)
-              .font('Helvetica');
-          } else {
-            // Regular text
-            doc.fontSize(11).text(section.content || '', { align: 'left', lineGap: 3 });
+              .moveDown(0.25)
+              .font('Helvetica')
+              .fillColor('black');
+          } else if (section.content) {
+            // Regular content - handle bullets and lists
+            const text = section.content;
+            
+            if (text.startsWith('•') || text.startsWith('- ') || text.match(/^\d+\./)) {
+              // List item - indent slightly
+              doc.fontSize(11).text(text, { align: 'left', lineGap: 2, indent: 15 });
+            } else if (text.trim() === '') {
+              // Blank line
+              doc.moveDown(0.1);
+            } else {
+              // Regular paragraph
+              doc.fontSize(11).text(text, { align: 'left', lineGap: 3 });
+            }
           }
 
-          doc.moveDown(0.3);
+          doc.moveDown(0.2);
         });
       } catch (parseError) {
         console.error('Error parsing content for PDF:', parseError);
@@ -116,7 +134,19 @@ export async function generatePDFFromContent(
 }
 
 /**
+ * Convert camelCase or snake_case keys to readable titles
+ */
+function formatKeyName(key: string): string {
+  return key
+    .replace(/([A-Z])/g, ' $1') // Add space before capitals
+    .replace(/_/g, ' ') // Replace underscores with spaces
+    .replace(/\b\w/g, char => char.toUpperCase()) // Title case
+    .trim();
+}
+
+/**
  * Parse AI-generated content into structured PDF sections
+ * Maintains hierarchy: headings > subheadings > lists > content
  */
 function parseContentForPDF(content: string) {
   const sections: PDFSection[] = [];
@@ -125,74 +155,95 @@ function parseContentForPDF(content: string) {
     // Try to parse as JSON first
     const json = JSON.parse(content);
     
-    // Extract all text values from JSON and create sections
-    const extractText = (obj: any, depth = 0): string[] => {
-      const texts: string[] = [];
-      
+    /**
+     * Recursively process JSON object to preserve structure
+     */
+    const processObject = (obj: any, depth = 0) => {
       if (typeof obj === 'string') {
+        // Simple string - add as content
         if (obj.trim().length > 0) {
-          texts.push(obj);
+          sections.push({
+            content: obj.trim(),
+          });
         }
       } else if (Array.isArray(obj)) {
-        obj.forEach(item => {
+        // Array - convert to numbered list
+        obj.forEach((item, idx) => {
           if (typeof item === 'string') {
-            texts.push(item);
-          } else if (typeof item === 'object') {
-            if (item.subject || item.title || item.name || item.content || item.body) {
-              const text = item.subject || item.title || item.name || item.content || item.body || '';
-              if (text) texts.push(String(text));
-            }
-            texts.push(...extractText(item, depth + 1));
-          }
-        });
-      } else if (typeof obj === 'object') {
-        Object.keys(obj).forEach(key => {
-          // Use key as section header
-          const value = obj[key];
-          if (key !== 'undefined' && key !== 'null') {
-            const headerText = key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
-            if (headerText.length > 0) {
+            sections.push({
+              content: `${idx + 1}. ${item}`,
+            });
+          } else if (typeof item === 'object' && item !== null) {
+            // Object in array - extract all string fields
+            const itemTexts: string[] = [];
+            Object.entries(item).forEach(([key, value]) => {
+              if (typeof value === 'string' && value.trim()) {
+                itemTexts.push(`${formatKeyName(key)}: ${value}`);
+              }
+            });
+            if (itemTexts.length > 0) {
               sections.push({
-                title: headerText,
-                isHeading: true,
+                content: `${idx + 1}. ${itemTexts.join(' | ')}`,
               });
             }
           }
+        });
+      } else if (typeof obj === 'object' && obj !== null) {
+        // Object - create hierarchy of sections
+        Object.entries(obj).forEach(([key, value]) => {
+          // Skip empty keys
+          if (!key || key === 'undefined' || key === 'null') return;
 
+          const keyName = formatKeyName(key);
+
+          // Determine heading level based on depth and key length
+          const isMainHeading = depth === 0;
+          
+          // Add section header
+          sections.push({
+            title: keyName,
+            isHeading: isMainHeading,
+            isSubheading: !isMainHeading,
+          });
+
+          // Process the value
           if (typeof value === 'string') {
             if (value.trim().length > 0) {
               sections.push({
-                content: value,
+                content: value.trim(),
               });
             }
           } else if (Array.isArray(value)) {
+            // Array content - preserve list structure
             value.forEach((item, idx) => {
               if (typeof item === 'string') {
                 sections.push({
-                  content: `${idx + 1}. ${item}`,
+                  content: `• ${item}`,
                 });
-              } else if (typeof item === 'object') {
-                const itemText = Object.values(item)
-                  .filter(v => typeof v === 'string')
-                  .join(' - ');
-                if (itemText) {
+              } else if (typeof item === 'object' && item !== null) {
+                const itemContent = Object.entries(item)
+                  .map(([k, v]) => `${v}`)
+                  .filter(v => v && v.trim().length > 0)
+                  .join(' — ');
+                if (itemContent) {
                   sections.push({
-                    content: itemText,
+                    content: `• ${itemContent}`,
                   });
                 }
               }
             });
           } else if (typeof value === 'object' && value !== null) {
-            const parsed = parseContentForPDF(JSON.stringify(value));
-            sections.push(...parsed.sections);
+            // Nested object - recurse with increased depth
+            processObject(value, depth + 1);
           }
+
+          // Add spacing after section
+          sections.push({ content: '' });
         });
       }
-      
-      return texts;
     };
 
-    extractText(json);
+    processObject(json);
     
     if (sections.length === 0) {
       // Fallback: treat content as plain text
