@@ -97,7 +97,10 @@ const PersonalizationForm: React.FC = () => {
 
       // Determine API URL based on environment
       const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const apiUrl = isDevelopment ? 'http://localhost:3000/api/generate-pdf' : '/api/generate-pdf';
+      
+      // TODO: Reemplaza con tu URL de Railway
+      const railwayApiUrl = 'https://YOUR_RAILWAY_API_URL.railway.app'; // Reemplazar después del deploy
+      const apiUrl = isDevelopment ? 'http://localhost:3000/api/generate-pdf' : `${railwayApiUrl}/api/generate-pdf`;
       
       console.log(`[Form] Using API URL: ${apiUrl}`);
       const response = await fetch(apiUrl, {

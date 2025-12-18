@@ -29,14 +29,33 @@ async function callGeminiAPI(prompt: string, apiKey: string): Promise<string> {
       });
       res.on('end', () => {
         try {
+          console.log('[API] Gemini response received, parsing...');
           const parsed = JSON.parse(responseData);
-          if (parsed.candidates && parsed.candidates[0]?.content?.parts[0]?.text) {
-            resolve(parsed.candidates[0].content.parts[0].text);
-          } else {
-            reject(new Error('No content in Gemini response'));
+          
+          // Log the response structure for debugging
+          console.log('[API] Response structure:', {
+            hasError: parsed.error ? true : false,
+            hasCandidates: parsed.candidates ? true : false,
+            candidatesLength: parsed.candidates?.length || 0
+          });
+
+          if (parsed.error) {
+            reject(new Error(`Gemini API error: ${parsed.error.message}`));
+            return;
           }
+
+          if (parsed.candidates && parsed.candidates.length > 0) {
+            const content = parsed.candidates[0]?.content?.parts?.[0]?.text;
+            if (content) {
+              console.log('[API] Content extracted successfully');
+              resolve(content);
+              return;
+            }
+          }
+
+          reject(new Error(`No content in Gemini response: ${JSON.stringify(parsed).substring(0, 200)}`));
         } catch (e) {
-          reject(new Error(`Failed to parse Gemini response: ${responseData}`));
+          reject(new Error(`Failed to parse Gemini response: ${responseData.substring(0, 200)}`));
         }
       });
     });
