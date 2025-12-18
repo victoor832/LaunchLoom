@@ -33,36 +33,33 @@ export const generateLaunchPlanServer = async (
     : '';
 
   const prompt = isPro 
-    ? `You are a launch strategist. Generate a CONCISE PRO+ launch playbook in JSON format. Keep content practical and actionable.
+    ? `You are a launch strategist. Generate a PRO+ launch playbook in JSON format.
 
 PRODUCT: ${formData.productName} | AUDIENCE: ${formData.targetAudience} | DAYS: ${daysUntilLaunch} | BUDGET: ${proData?.budget}
-CHANNELS: ${channels} | COMPETITOR: ${proData?.mainCompetitor || 'auto-detect'}
+CHANNELS: ${channels}
 
-Generate JSON with:
-- Executive Summary (2-3 paragraphs)
-- Competitor Analysis (vs 2-3 real competitors)
-- Budget Breakdown (with allocations)
-- 10 email sequences
-- 20 Twitter posts
-- 10 LinkedIn posts
-- 7-day action plan
-- Product Hunt strategy
-- Success Metrics
-
-Return valid JSON with all fields populated.`
-    : `You are a launch strategist. Generate a CONCISE STANDARD launch playbook in JSON format.
+Generate JSON with these EXACT keys:
+{
+  "executiveSummary": "...",
+  "emailSequences": ["..."],
+  "twitterPosts": ["..."],
+  "linkedinPosts": ["..."],
+  "timeline": ["..."],
+  "successMetrics": "..."
+}`
+    : `You are a launch strategist. Generate a STANDARD launch playbook in JSON format.
 
 PRODUCT: ${formData.productName} | AUDIENCE: ${formData.targetAudience} | DAYS: ${daysUntilLaunch}
 
-Generate JSON with:
-- Executive Summary
-- Go-to-Market Strategy
-- 5 email templates
-- 15 social media posts
-- 7-day timeline
-- Success Metrics
-
-Return valid JSON with all fields populated.`;
+Generate JSON with these EXACT keys:
+{
+  "summary": "...",
+  "strategy": "...",
+  "emails": ["...", "..."],
+  "posts": ["...", "..."],
+  "timeline": ["day 1: ...", "day 2: ..."],
+  "metrics": "..."
+}`;
 
   try {
     console.log('[Gemini] Generating launch plan...');
