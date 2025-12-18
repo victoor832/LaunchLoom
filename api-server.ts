@@ -9,16 +9,27 @@ import { join } from 'path';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware - CORS debe ser primero
+// CORS configuration - must be first middleware
+const corsOptions = {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    // Allow all origins including requests without origin (like mobile apps)
+    callback(null, true);
+  },
+  methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false,
+  maxAge: 3600,
+  preflightContinue: false
+};
+
+app.use(cors(corsOptions));
+
+// Additional CORS headers as fallback
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.header('Access-Control-Max-Age', '3600');
-  
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
   next();
 });
 
@@ -128,6 +139,9 @@ app.post('/api/generate-pdf', async (req: Request, res: Response) => {
 
     // Send PDF to client
     console.log(`[API] Sending PDF to client...`);
+    res.set('Content-Type', 'application/pdf');
+    res.set('Content-Disposition', `attachment; filename="${input.productName}-${input.tier}-playbook.pdf"`);
+    res.set('Access-Control-Allow-Origin', '*');
     res.send(pdfBuffer);
 
   } catch (error) {
