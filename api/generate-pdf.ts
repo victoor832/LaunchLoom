@@ -1,6 +1,10 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { generateLaunchPlanServer } from '../services/geminiServerService';
+import { generateWordDocument, WordDocumentInput } from '../services/wordGeneratorService';
+import { convertWordToPDF } from '../services/pdfConverterService';
 
-// For now, return a placeholder PDF for all tiers
 export default async (req: VercelRequest, res: VercelResponse) => {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -16,7 +20,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
   }
 
   try {
-    const { productName, targetAudience, launchDate, tier, daysToLaunch } = req.body;
+    const { productName, targetAudience, launchDate, tier, daysToLaunch, productDescription, currentTraction, budget, selectedChannels, hasProductHuntExperience, mainCompetitor } = req.body;
 
     // Validate required fields
     if (!productName || !targetAudience || !launchDate || !tier) {
@@ -25,58 +29,80 @@ export default async (req: VercelRequest, res: VercelResponse) => {
 
     console.log(`[API] Processing ${tier} tier for: ${productName}`);
 
-    // TODO: Integrate with Gemini API to generate real content
-    // For now, return a placeholder PDF
+    // For free tier, serve static PDF
+    if (tier === 'free') {
+      try {
+        const pdfPath = join(process.cwd(), 'public', 'reports', 'ColdMailAI-free-plan.pdf');
+        const pdfBuffer = readFileSync(pdfPath);
+        
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${productName}-free-plan.pdf"`);
+        return res.status(200).send(pdfBuffer);
+      } catch (error) {
+        console.error('[API] Error reading static PDF:', error);
+        return res.status(500).json({ error: 'Failed to serve free plan PDF' });
+      }
+    }
 
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${productName}-playbook-${tier}.pdf"`);
-    
-    // Return a simple PDF placeholder
-    const pdfContent = `%PDF-1.4
-1 0 obj
-<< /Type /Catalog /Pages 2 0 R >>
-endobj
-2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
-endobj
-3 0 obj
-<< /Type /Page /Parent 2 0 R /Resources 4 0 R /MediaBox [0 0 612 792] /Contents 5 0 R >>
-endobj
-4 0 obj
-<< /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >>
-endobj
-5 0 obj
-<< /Length 200 >>
-stream
-BT
-/F1 16 Tf
-50 750 Td
-(${productName} - Launch Playbook) Tj
-0 -30 Td
-/F1 12 Tf
-(Target: ${targetAudience}) Tj
-0 -20 Td
-(Launch Date: ${launchDate}) Tj
-0 -20 Td
-(Tier: ${tier}) Tj
-ET
-endstream
-endobj
-xref
-0 6
-0000000000 65535 f
-0000000009 00000 n
-0000000058 00000 n
-0000000115 00000 n
-0000000214 00000 n
-0000000317 00000 n
-trailer
-<< /Size 6 /Root 1 0 R >>
-startxref
-567
-%%EOF`;
+    // For standard and pro tiers, generate with AI
+    console.log(`[API] Generating content for ${tier} tier...`);
 
-    return res.status(200).send(Buffer.from(pdfContent, 'utf8'));
+    try {
+      // Build form data for Gemini
+      const formData: any = {
+        productName,
+        targetAudience,
+        launchDate,
+      };
+
+      // Add Pro+ fields if applicable
+      if (tier === 'pro') {
+        formData.productDescription = productDescription;
+        formData.currentTraction = currentTraction;
+        formData.budget = budget;
+        formData.selectedChannels = selectedChannels;
+        formData.hasProductHuntExperience = hasProductHuntExperience;
+        formData.mainCompetitor = mainCompetitor;
+      }
+
+      // Step 1: Generate content with Gemini
+      console.log(`[API] Step 1: Calling Gemini API...`);
+      const generatedContent = await generateLaunchPlanServer(formData, tier as 'standard' | 'pro');
+
+      if (!generatedContent || generatedContent.trim().length === 0) {
+        throw new Error('Gemini API returned empty content');
+      }
+
+      console.log(`[API] Step 1 Complete: Generated ${generatedContent.length} characters`);
+
+      // Step 2: Create Word document
+      console.log(`[API] Step 2: Creating Word document...`);
+      const wordInput: WordDocumentInput = {
+        productName,
+        targetAudience,
+        launchDate,
+        tier: tier as 'free' | 'standard' | 'pro',
+        daysToLaunch: daysToLaunch || 0,
+        generatedContent,
+      };
+
+      const wordBuffer = await generateWordDocument(wordInput);
+      console.log(`[API] Step 2 Complete: Word document created (${wordBuffer.length} bytes)`);
+
+      // Step 3: Convert to PDF
+      console.log(`[API] Step 3: Converting Word to PDF...`);
+      const pdfBuffer = await convertWordToPDF(wordBuffer);
+      console.log(`[API] Step 3 Complete: PDF created (${pdfBuffer.length} bytes)`);
+
+      // Send PDF to client
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${productName}-launch-playbook-${tier}.pdf"`);
+      return res.status(200).send(pdfBuffer);
+
+    } catch (error) {
+      console.error('[API] Generation Error:', error);
+      throw error;
+    }
 
   } catch (error) {
     console.error('[API] Error:', error);
