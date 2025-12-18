@@ -106,7 +106,7 @@ const PersonalizationForm: React.FC = () => {
       console.log(`[Form] Using API URL: ${apiUrl}`);
       
       // Try to use cached PDF from localStorage first
-      const cacheKey = `pdf_${input.productName}_${input.tier}`;
+      const cacheKey = `pdf_${data.productName}_${tierId}`;
       const cachedPdf = localStorage.getItem(cacheKey);
       
       if (cachedPdf) {
