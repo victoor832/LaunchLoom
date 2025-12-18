@@ -2,15 +2,6 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Instalar LibreOffice y dependencias necesarias
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libreoffice \
-    libreoffice-writer \
-    libreoffice-calc \
-    libreoffice-impress \
-    fonts-liberation \
-    && rm -rf /var/lib/apt/lists/*
-
 # Instalar pnpm
 RUN npm install -g pnpm
 

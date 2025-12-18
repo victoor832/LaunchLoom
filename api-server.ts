@@ -1,8 +1,7 @@
 import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import { generateLaunchPlanServer } from './services/geminiServerService';
-import { generateWordDocument, WordDocumentInput } from './services/wordGeneratorService';
-import { convertWordToPDF } from './services/pdfConverterService';
+import { generatePDFFromContent } from './services/pdfKitService';
 import cors from 'cors';
 import { createReadStream, existsSync } from 'fs';
 import { join } from 'path';
@@ -122,24 +121,10 @@ app.post('/api/generate-pdf', async (req: Request, res: Response) => {
 
     console.log(`[API] Step 1 Complete: Generated ${generatedContent.length} characters`);
 
-    // Step 2: Create Word document
-    console.log(`[API] Step 2: Creating Word document...`);
-    const wordInput: WordDocumentInput = {
-      productName: input.productName,
-      targetAudience: input.targetAudience,
-      launchDate: input.launchDate,
-      tier: input.tier,
-      daysToLaunch: input.daysToLaunch,
-      generatedContent: generatedContent,
-    };
-
-    const wordBuffer = await generateWordDocument(wordInput);
-    console.log(`[API] Step 2 Complete: Word document created (${wordBuffer.length} bytes)`);
-
-    // Step 3: Convert Word to PDF
-    console.log(`[API] Step 3: Converting Word to PDF...`);
-    const pdfBuffer = await convertWordToPDF(wordBuffer);
-    console.log(`[API] Step 3 Complete: PDF created (${pdfBuffer.length} bytes)`);
+    // Step 2: Generate PDF directly from content (no Word intermediate step)
+    console.log(`[API] Step 2: Generating PDF from content...`);
+    const pdfBuffer = await generatePDFFromContent(input.productName, generatedContent, input.tier);
+    console.log(`[API] Step 2 Complete: PDF created (${pdfBuffer.length} bytes)`);
 
     // Send PDF to client
     console.log(`[API] Sending PDF to client...`);
