@@ -20,6 +20,9 @@ export async function generatePDFFromContent(
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
+      console.log(`[PDF] Starting PDF generation for ${productName} (${tier} tier)`);
+      console.log(`[PDF] Content length: ${content.length} characters`);
+      
       const doc = new PDFDocument({
         size: 'A4',
         margin: 40,
@@ -30,10 +33,19 @@ export async function generatePDFFromContent(
 
       doc.on('data', (chunk) => chunks.push(chunk));
       doc.on('end', () => {
-        const pdfBuffer = Buffer.concat(chunks);
-        resolve(pdfBuffer);
+        try {
+          const pdfBuffer = Buffer.concat(chunks);
+          console.log(`[PDF] PDF generation complete: ${pdfBuffer.length} bytes`);
+          resolve(pdfBuffer);
+        } catch (bufferError) {
+          console.error(`[PDF] Buffer concatenation error:`, bufferError);
+          reject(bufferError);
+        }
       });
-      doc.on('error', reject);
+      doc.on('error', (docError) => {
+        console.error(`[PDF] PDFDocument error:`, docError);
+        reject(docError);
+      });
 
       // Title
       doc
@@ -57,64 +69,78 @@ export async function generatePDFFromContent(
 
       // Parse content and add to PDF
       try {
+        console.log(`[PDF] Parsing content for sections...`);
         const parsed = parseContentForPDF(content);
+        console.log(`[PDF] Parsed into ${parsed.sections.length} sections`);
         let pageNum = 2;
 
         // Add sections
         parsed.sections.forEach((section, index) => {
-          // Skip empty sections
-          if (!section.title && !section.content) return;
+          try {
+            // Skip empty sections
+            if (!section.title && !section.content) return;
 
-          // Check if we need a page break
-          if (doc.y > doc.page.height - 80) {
-            doc.addPage();
-            pageNum++;
-            doc.fontSize(10).fillColor('#999999').text(`Page ${pageNum}`, { align: 'right' });
-            doc.moveUp(0.5);
-          }
-
-          if (section.isHeading) {
-            // Main heading
-            doc
-              .fontSize(16)
-              .font('Helvetica-Bold')
-              .fillColor('#0066CC')
-              .text(section.title, { underline: true })
-              .moveDown(0.4)
-              .fillColor('black')
-              .font('Helvetica');
-          } else if (section.isSubheading) {
-            // Subheading
-            doc
-              .fontSize(13)
-              .font('Helvetica-Bold')
-              .fillColor('#333333')
-              .text(section.title)
-              .moveDown(0.25)
-              .font('Helvetica')
-              .fillColor('black');
-          } else if (section.content) {
-            // Regular content - handle bullets and lists
-            const text = section.content;
-            
-            if (text.startsWith('•') || text.startsWith('- ') || text.match(/^\d+\./)) {
-              // List item - indent slightly
-              doc.fontSize(11).text(text, { align: 'left', lineGap: 2, indent: 15 });
-            } else if (text.trim() === '') {
-              // Blank line
-              doc.moveDown(0.1);
-            } else {
-              // Regular paragraph
-              doc.fontSize(11).text(text, { align: 'left', lineGap: 3 });
+            // Check if we need a page break
+            if (doc.y > doc.page.height - 80) {
+              doc.addPage();
+              pageNum++;
+              doc.fontSize(10).fillColor('#999999').text(`Page ${pageNum}`, { align: 'right' });
+              doc.moveUp(0.5);
             }
-          }
 
-          doc.moveDown(0.2);
+            if (section.isHeading) {
+              // Main heading
+              doc
+                .fontSize(16)
+                .font('Helvetica-Bold')
+                .fillColor('#0066CC')
+                .text(section.title || '', { underline: true })
+                .moveDown(0.4)
+                .fillColor('black')
+                .font('Helvetica');
+            } else if (section.isSubheading) {
+              // Subheading
+              doc
+                .fontSize(13)
+                .font('Helvetica-Bold')
+                .fillColor('#333333')
+                .text(section.title || '')
+                .moveDown(0.25)
+                .font('Helvetica')
+                .fillColor('black');
+            } else if (section.content) {
+              // Regular content - handle bullets and lists
+              const text = section.content;
+              
+              if (text.startsWith('•') || text.startsWith('- ') || text.match(/^\d+\./)) {
+                // List item - indent slightly
+                doc.fontSize(11).text(text, { align: 'left', lineGap: 2, indent: 15 });
+              } else if (text.trim() === '') {
+                // Blank line
+                doc.moveDown(0.1);
+              } else {
+                // Regular paragraph
+                doc.fontSize(11).text(text, { align: 'left', lineGap: 3 });
+              }
+            }
+
+            doc.moveDown(0.2);
+          } catch (sectionError) {
+            console.warn(`[PDF] Error rendering section ${index}:`, sectionError);
+            // Continue with next section even if this one fails
+          }
         });
+        console.log(`[PDF] Finished rendering sections`);
       } catch (parseError) {
-        console.error('Error parsing content for PDF:', parseError);
-        // If parsing fails, just add raw content
-        doc.fontSize(11).text(content, { align: 'left', lineGap: 3 });
+        console.error('[PDF] Error parsing content for PDF:', parseError);
+        // If parsing fails, just add raw content as fallback
+        try {
+          doc.fontSize(11).text(content, { align: 'left', lineGap: 3 });
+        } catch (rawError) {
+          console.error('[PDF] Error rendering raw content fallback:', rawError);
+          // Last resort - add a message
+          doc.fontSize(11).text('Unable to render content. Please try again.');
+        }
       }
 
       // Footer with page numbers

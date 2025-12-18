@@ -147,56 +147,71 @@ app.post('/api/generate-pdf', async (req: Request, res: Response) => {
     let generatedContent = getFromCache(cacheKey);
 
     if (!generatedContent) {
-      // Step 1: Generate content with Gemini AI
-      console.log(`[API] Step 1: Calling Gemini API...`);
-      const startTime = Date.now();
-      
-      generatedContent = await generateLaunchPlanServer(
-        {
-        productName: input.productName,
-        targetAudience: input.targetAudience,
-        launchDate: input.launchDate,
-        // Add Pro+ fields if present
-        ...(input.tier === 'pro' && {
-          productDescription: input.productDescription,
-          currentTraction: input.currentTraction,
-          budget: input.budget,
-          selectedChannels: input.selectedChannels,
-          hasProductHuntExperience: input.hasProductHuntExperience,
-          mainCompetitor: input.mainCompetitor,
-        }),
-      } as any,
-      input.tier as 'standard' | 'pro'
-      );
+      try {
+        // Step 1: Generate content with Gemini AI
+        console.log(`[API] Step 1: Calling Gemini API...`);
+        const startTime = Date.now();
+        
+        generatedContent = await generateLaunchPlanServer(
+          {
+          productName: input.productName,
+          targetAudience: input.targetAudience,
+          launchDate: input.launchDate,
+          // Add Pro+ fields if present
+          ...(input.tier === 'pro' && {
+            productDescription: input.productDescription,
+            currentTraction: input.currentTraction,
+            budget: input.budget,
+            selectedChannels: input.selectedChannels,
+            hasProductHuntExperience: input.hasProductHuntExperience,
+            mainCompetitor: input.mainCompetitor,
+          }),
+        } as any,
+        input.tier as 'standard' | 'pro'
+        );
 
-      const geminiTime = Date.now() - startTime;
-      console.log(`[API] Step 1 Complete: Generated ${generatedContent.length} characters in ${geminiTime}ms`);
+        const geminiTime = Date.now() - startTime;
+        console.log(`[API] Step 1 Complete: Generated ${generatedContent.length} characters in ${geminiTime}ms`);
 
-      if (!generatedContent || generatedContent.trim().length === 0) {
-        throw new Error('Gemini API returned empty content');
+        if (!generatedContent || generatedContent.trim().length === 0) {
+          throw new Error('Gemini API returned empty content');
+        }
+
+        // Cache the result
+        setCache(cacheKey, generatedContent);
+      } catch (geminiError) {
+        console.error('[API] Gemini error:', geminiError);
+        throw new Error(`Gemini API failed: ${geminiError instanceof Error ? geminiError.message : String(geminiError)}`);
       }
-
-      // Cache the result
-      setCache(cacheKey, generatedContent);
     } else {
       console.log(`[API] Step 1: Using cached content (${generatedContent.length} characters)`);
     }
 
     // Step 2: Generate PDF directly from content
-    console.log(`[API] Step 2: Generating PDF from content...`);
-    const pdfBuffer = await generatePDFFromContent(input.productName, generatedContent, input.tier);
-    console.log(`[API] Step 2 Complete: PDF created (${pdfBuffer.length} bytes)`);
+    try {
+      console.log(`[API] Step 2: Generating PDF from content...`);
+      const pdfBuffer = await generatePDFFromContent(input.productName, generatedContent, input.tier);
+      console.log(`[API] Step 2 Complete: PDF created (${pdfBuffer.length} bytes)`);
 
-    // Send PDF to client
-    console.log(`[API] Sending PDF to client...`);
-    res.set('Content-Type', 'application/pdf');
-    res.set('Content-Disposition', `attachment; filename="${input.productName}-${input.tier}-playbook.pdf"`);
-    res.set('Access-Control-Allow-Origin', '*');
-    res.send(pdfBuffer);
+      // Send PDF to client
+      console.log(`[API] Sending PDF to client...`);
+      res.set('Content-Type', 'application/pdf');
+      res.set('Content-Disposition', `attachment; filename="${input.productName}-${input.tier}-playbook.pdf"`);
+      res.set('Access-Control-Allow-Origin', '*');
+      res.send(pdfBuffer);
+    } catch (pdfError) {
+      console.error('[API] PDF generation error:', pdfError);
+      throw new Error(`PDF generation failed: ${pdfError instanceof Error ? pdfError.message : String(pdfError)}`);
+    }
 
   } catch (error) {
     console.error('[API] Error:', error);
     const errorMsg = error instanceof Error ? error.message : String(error);
+    
+    // Always send CORS headers even on error
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
     if (!res.headersSent) {
       res.status(500).json({ 
