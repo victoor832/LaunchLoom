@@ -102,6 +102,15 @@ Return ONLY valid JSON with ALL fields populated. No markdown, no explanation.`;
     return content;
   } catch (error) {
     console.error('[Gemini] Error generating content:', error);
-    throw new Error(`Gemini API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    
+    // Check if it's a quota error
+    if (errorMsg.includes('RESOURCE_EXHAUSTED') || errorMsg.includes('quota')) {
+      console.error('[Gemini] ⚠️  QUOTA EXCEEDED - Free tier limit reached (20 requests/day). Please upgrade to a paid plan.');
+      throw new Error('Gemini API quota exceeded. Free tier allows only 20 requests per day. Please upgrade to a paid plan at https://ai.google.dev/pricing');
+    }
+    
+    throw new Error(`Gemini API error: ${errorMsg}`);
   }
 };
