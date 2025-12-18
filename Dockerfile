@@ -1,14 +1,15 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
-# Instalar LibreOffice y dependencias
-RUN apk add --no-cache \
+# Instalar LibreOffice y dependencias necesarias
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libreoffice \
-    libreoffice-headless \
-    libreoffice-impress \
+    libreoffice-writer \
     libreoffice-calc \
-    libreoffice-writer
+    libreoffice-impress \
+    fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
 
 # Instalar pnpm
 RUN npm install -g pnpm
