@@ -148,7 +148,13 @@ app.post('/api/generate-pdf', async (req: Request, res: Response) => {
  * Health check endpoint
  */
 app.get('/api/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    version: '2.0-pdfkit-direct',
+    cors: 'enabled',
+    buildTime: new Date().toISOString()
+  });
 });
 
 // Start server
