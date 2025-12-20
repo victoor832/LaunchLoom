@@ -88,10 +88,19 @@ Generate JSON:
 
   try {
     console.log('[Gemini] Generating launch plan...');
-    const result = await genAI.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    });
+    
+    // Add 45-second timeout to prevent Istio timeout (60s)
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Gemini API request timeout after 45 seconds')), 45000)
+    );
+
+    const result = await Promise.race([
+      genAI.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      }),
+      timeoutPromise
+    ]) as any;
 
     const content = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
     
@@ -120,8 +129,14 @@ Generate JSON:
     
     // Check if it's a quota error
     if (errorMsg.includes('RESOURCE_EXHAUSTED') || errorMsg.includes('quota')) {
-      console.error('[Gemini] ⚠️  QUOTA EXCEEDED - Free tier limit reached (20 requests/day). Please upgrade to a paid plan.');
+      console.error('[Gemini] ⚠️  QUOTA EXCEEDED - Free tier limit reached (20 requests/day)');
       throw new Error('Gemini API quota exceeded. Free tier allows only 20 requests per day. Please upgrade to a paid plan at https://ai.google.dev/pricing');
+    }
+
+    // Check if it's a timeout
+    if (errorMsg.includes('timeout')) {
+      console.error('[Gemini] ⚠️  Timeout - API took too long');
+      throw new Error('Gemini API request timed out. Please try again in a moment.');
     }
     
     throw new Error(`Gemini API error: ${errorMsg}`);

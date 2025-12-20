@@ -149,26 +149,31 @@ app.post('/api/generate-pdf', async (req: Request, res: Response) => {
     if (!generatedContent) {
       try {
         // Step 1: Generate content with Gemini AI
-        console.log(`[API] Step 1: Calling Gemini API...`);
+        console.log(`[API] Step 1: Calling Gemini API (timeout: 45s)...`);
         const startTime = Date.now();
         
-        generatedContent = await generateLaunchPlanServer(
-          {
-          productName: input.productName,
-          targetAudience: input.targetAudience,
-          launchDate: input.launchDate,
-          // Add Pro+ fields if present
-          ...(input.tier === 'pro' && {
-            productDescription: input.productDescription,
-            currentTraction: input.currentTraction,
-            budget: input.budget,
-            selectedChannels: input.selectedChannels,
-            hasProductHuntExperience: input.hasProductHuntExperience,
-            mainCompetitor: input.mainCompetitor,
-          }),
-        } as any,
-        input.tier as 'standard' | 'pro'
-        );
+        generatedContent = await Promise.race([
+          generateLaunchPlanServer(
+            {
+            productName: input.productName,
+            targetAudience: input.targetAudience,
+            launchDate: input.launchDate,
+            // Add Pro+ fields if present
+            ...(input.tier === 'pro' && {
+              productDescription: input.productDescription,
+              currentTraction: input.currentTraction,
+              budget: input.budget,
+              selectedChannels: input.selectedChannels,
+              hasProductHuntExperience: input.hasProductHuntExperience,
+              mainCompetitor: input.mainCompetitor,
+            }),
+          } as any,
+          input.tier as 'standard' | 'pro'
+          ),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Gemini API timeout at API level (45s)')), 45000)
+          )
+        ]);
 
         const geminiTime = Date.now() - startTime;
         console.log(`[API] Step 1 Complete: Generated ${generatedContent.length} characters in ${geminiTime}ms`);
@@ -181,7 +186,14 @@ app.post('/api/generate-pdf', async (req: Request, res: Response) => {
         setCache(cacheKey, generatedContent);
       } catch (geminiError) {
         console.error('[API] Gemini error:', geminiError);
-        throw new Error(`Gemini API failed: ${geminiError instanceof Error ? geminiError.message : String(geminiError)}`);
+        const errorMsg = geminiError instanceof Error ? geminiError.message : String(geminiError);
+        
+        // Provide helpful error messages
+        if (errorMsg.includes('timeout')) {
+          throw new Error(`Gemini API is taking too long (timeout). This often means quota is exhausted or service is slow. Please try again in a moment.`);
+        }
+        
+        throw new Error(`Gemini API failed: ${errorMsg}`);
       }
     } else {
       console.log(`[API] Step 1: Using cached content (${generatedContent.length} characters)`);
