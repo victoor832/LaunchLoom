@@ -28,24 +28,49 @@ export const generateLaunchPlanServer = async (
 
   const isPro = tier === 'pro';
 
-  // Balanced prompts: concise but comprehensive
+  // Optimized prompts: full content but concise instructions
   const prompt = isPro 
-    ? `Launch strategy for ${formData.productName} targeting ${formData.targetAudience}, launching in ${daysUntilLaunch} days. Return valid JSON only, no markdown:
+    ? `Generate PRO tier launch playbook JSON for: ${formData.productName}, Target: ${formData.targetAudience}, Days until launch: ${daysUntilLaunch}
+
+Return ONLY valid JSON, no markdown or explanation:
 {
-  "executiveSummary": "3-4 sentences on why launch now and 90-day vision",
-  "targetMarketAnalysis": "3 sentences on TAM and customer pain points",  
-  "positioning": "2 sentences on differentiation and value",
-  "emailSequence": [{"subject": "Awareness", "body": "2-3 sentences hook"}, {"subject": "Features", "body": "2-3 sentences benefit"}, {"subject": "Social Proof", "body": "2-3 sentences credibility"}, {"subject": "CTA", "body": "2-3 sentences action"}],
-  "launch5DayPlan": [{"day": "Day 1", "actions": "pre-launch prep"}, {"day": "Day 2", "actions": "content setup"}, {"day": "Day 3", "actions": "audience warmup"}, {"day": "Day 4", "actions": "final checklist"}, {"day": "Day 5", "actions": "go live sequence"}],
-  "successMetrics": ["Signups/Early Access", "Email Open Rate", "Social Engagement", "Launch Day Conversions"]
+  "executiveSummary": "Write 3-4 sentences: why launch now, target market opportunity, competitive advantage, 90-day vision",
+  "targetMarketAnalysis": "Write 3 sentences analyzing TAM, pain points, buying signals",
+  "positioning": "Write 2 sentences on value prop and differentiation",
+  "emailSequence": [
+    {"subject": "Pre-launch awareness hook", "body": "3-4 sentences hook copy"},
+    {"subject": "Feature benefit", "body": "3-4 sentences benefit copy"},
+    {"subject": "Social proof", "body": "3-4 sentences credibility copy"},
+    {"subject": "Strong CTA", "body": "3-4 sentences urgency and call-to-action"}
+  ],
+  "launch5DayPlan": [
+    {"day": "Day 1 (5 days before)", "actions": "List 3-4 specific pre-launch actions"},
+    {"day": "Day 2 (4 days before)", "actions": "List 3-4 specific actions"},
+    {"day": "Day 3 (3 days before)", "actions": "List 3-4 specific actions"},
+    {"day": "Day 4 (2 days before)", "actions": "List 3-4 specific actions"},
+    {"day": "Day 5 (Launch day)", "actions": "List 3-4 launch day actions"}
+  ],
+  "successMetrics": ["Metric 1 with success threshold", "Metric 2 with success threshold", "Metric 3 with success threshold", "Metric 4 with success threshold"]
 }`
-    : `Launch strategy for ${formData.productName} targeting ${formData.targetAudience}, launching in ${daysUntilLaunch} days. Return valid JSON only, no markdown:
+    : `Generate STANDARD tier launch playbook JSON for: ${formData.productName}, Target: ${formData.targetAudience}, Days until launch: ${daysUntilLaunch}
+
+Return ONLY valid JSON, no markdown or explanation:
 {
-  "executiveSummary": "3 sentences on why, audience, vision",
-  "targetMarket": "2-3 sentences on TAM and needs",
-  "emailSequence": [{"subject": "Awareness", "body": "2 sentences hook"}, {"subject": "Features", "body": "2 sentences benefit"}, {"subject": "CTA", "body": "2 sentences action"}],
-  "launch5DayPlan": [{"day": "Day 1", "actions": "prep"}, {"day": "Day 2", "actions": "setup"}, {"day": "Day 3", "actions": "warmup"}, {"day": "Day 4", "actions": "final"}, {"day": "Day 5", "actions": "launch"}],
-  "keyMetrics": ["Signups", "Engagement", "Conversions"]
+  "executiveSummary": "Write 3 sentences: why launch now, target customer, success vision",
+  "targetMarket": "Write 2-3 sentences on TAM, pain points, buying signals",
+  "emailSequence": [
+    {"subject": "Awareness hook", "body": "2-3 sentences hook"},
+    {"subject": "Feature benefit", "body": "2-3 sentences benefit"},
+    {"subject": "CTA", "body": "2-3 sentences action"}
+  ],
+  "launch5DayPlan": [
+    {"day": "Day 1 (5 days before)", "actions": "2-3 actions"},
+    {"day": "Day 2 (4 days before)", "actions": "2-3 actions"},
+    {"day": "Day 3 (3 days before)", "actions": "2-3 actions"},
+    {"day": "Day 4 (2 days before)", "actions": "2-3 actions"},
+    {"day": "Day 5 (Launch)", "actions": "2-3 launch actions"}
+  ],
+  "keyMetrics": ["Metric 1 with target", "Metric 2 with target", "Metric 3 with target"]
 }`;
 
   try {
