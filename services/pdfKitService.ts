@@ -12,15 +12,35 @@ export interface PDFSection {
 /**
  * Generate PDF directly from content without LibreOffice dependency
  * This is much lighter and faster than Word → PDF conversion
+ * 
+ * @param productNameOrContent - Product name (string) OR JSON object from Gemini
+ * @param contentOrTier - Content string OR tier name if first param is JSON
+ * @param tier - Optional tier if using old signature
  */
 export async function generatePDFFromContent(
-  productName: string,
-  content: string,
-  tier: 'free' | 'standard' | 'pro'
+  productNameOrContent: string | Record<string, any>,
+  contentOrTier?: string,
+  tier?: 'free' | 'standard' | 'pro'
 ): Promise<Buffer> {
+  // Handle both old and new signatures
+  let productName: string;
+  let content: string;
+  let finalTier: 'free' | 'standard' | 'pro';
+
+  if (typeof productNameOrContent === 'object') {
+    // New signature: generatePDFFromContent(jsonObj, tier)
+    productName = (productNameOrContent.productName || productNameOrContent.product || 'Launch Playbook');
+    content = JSON.stringify(productNameOrContent);
+    finalTier = (contentOrTier as any) || 'standard';
+  } else {
+    // Old signature: generatePDFFromContent(productName, content, tier)
+    productName = productNameOrContent;
+    content = contentOrTier || '';
+    finalTier = tier || 'standard';
+  }
   return new Promise((resolve, reject) => {
     try {
-      console.log(`[PDF] Starting PDF generation for ${productName} (${tier} tier)`);
+      console.log(`[PDF] Starting PDF generation for ${productName} (${finalTier} tier)`);
       console.log(`[PDF] Content length: ${content.length} characters`);
       
       const doc = new PDFDocument({
@@ -55,11 +75,11 @@ export async function generatePDFFromContent(
         .moveDown(0.5);
 
       // Tier badge
-      const tierColor = tier === 'pro' ? '#00AA00' : tier === 'standard' ? '#0066CC' : '#666666';
+      const tierColor = finalTier === 'pro' ? '#00AA00' : finalTier === 'standard' ? '#0066CC' : '#666666';
       doc
         .fontSize(12)
         .fillColor(tierColor)
-        .text(`${tier.toUpperCase()} TIER`, { align: 'center' })
+        .text(`${finalTier.toUpperCase()} TIER`, { align: 'center' })
         .moveDown(1)
         .fillColor('black');
 
