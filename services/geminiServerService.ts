@@ -27,71 +27,33 @@ export const generateLaunchPlanServer = async (
   );
 
   const isPro = tier === 'pro';
-  const proData = isPro ? (formData as ProFormData) : null;
-  const channels = isPro
-    ? proData?.selectedChannels?.join(', ') || 'Twitter, Email, LinkedIn'
-    : '';
 
+  // Balanced prompts: concise but comprehensive
   const prompt = isPro 
-    ? `You are a SaaS launch strategist. Generate a COMPREHENSIVE PRO tier launch playbook.
-
-PRODUCT: ${formData.productName}
-AUDIENCE: ${formData.targetAudience}
-LAUNCH: ${daysUntilLaunch} days away
-
-CRITICAL REQUIREMENTS:
-- Return ONLY valid JSON with NO markdown code blocks
-- NO placeholders like "Post 1", "Email 1", etc
-- EVERY field must have REAL, specific, detailed content
-- Write 2-4 paragraphs for text fields (not just 1 sentence)
-- For arrays, provide 6-10 actual items with substance
-- Make content launch-ready and actionable
-
-Generate JSON:
+    ? `Launch strategy for ${formData.productName} targeting ${formData.targetAudience}, launching in ${daysUntilLaunch} days. Return valid JSON only, no markdown:
 {
-  "executiveSummary": "4 detailed paragraphs: 1) Why launch now, 2) Target market opportunity, 3) Key differentiators vs competitors, 4) 90-day success vision",
-  "targetMarketAnalysis": "3 detailed paragraphs analyzing TAM, customer pain points, and buying signals",
-  "competitorAnalysis": ["Competitor 1 name: Specific strengths (2-3 sentences)", "Competitor 2: Specific strengths", "How ${formData.productName} wins: 3-4 sentences"],
-  "positioning": "3 paragraphs: 1) Value proposition, 2) Differentiation story, 3) Market positioning",
-  "pricingStrategy": "2 paragraphs with specific pricing tiers, rationale, and positioning",
-  "goToMarketChannels": ["Channel 1: Detailed strategy for reaching ${formData.targetAudience}", "Channel 2: Specific tactics", "Channel 3: Success metrics"],
-  "emailSequence": ["Email 1 - Awareness (Subject, 3-4 sentences content)", "Email 2 - Feature showcase (Subject, 3-4 sentences)", "Email 3 - Social proof (Subject, 3-4 sentences)", "Email 4 - Urgency/CTA (Subject, 3-4 sentences)", "Email 5 - Post-signup (Subject, 3-4 sentences)", "Email 6 - Re-engagement (Subject, 3-4 sentences)"],
-  "socialMediaStrategy": ["Twitter strategy with 8 specific launch posts (each 2-3 sentences)", "LinkedIn strategy with 4 thought leadership posts (each 2-3 sentences)", "TikTok/Instagram strategy if applicable"],
-  "launchTimeline": ["Day 1 (5 days pre-launch): Specific actions", "Day 2: Specific actions", "Day 3: Specific actions", "Day 4: Specific actions", "Day 5 (Day of): Launch day sequence", "Day 6: Post-launch momentum"],
-  "successMetrics": ["Metric 1 with target and tracking method", "Metric 2", "Metric 3", "Metric 4", "Metric 5"]
+  "executiveSummary": "3-4 sentences on why launch now and 90-day vision",
+  "targetMarketAnalysis": "3 sentences on TAM and customer pain points",  
+  "positioning": "2 sentences on differentiation and value",
+  "emailSequence": [{"subject": "Awareness", "body": "2-3 sentences hook"}, {"subject": "Features", "body": "2-3 sentences benefit"}, {"subject": "Social Proof", "body": "2-3 sentences credibility"}, {"subject": "CTA", "body": "2-3 sentences action"}],
+  "launch5DayPlan": [{"day": "Day 1", "actions": "pre-launch prep"}, {"day": "Day 2", "actions": "content setup"}, {"day": "Day 3", "actions": "audience warmup"}, {"day": "Day 4", "actions": "final checklist"}, {"day": "Day 5", "actions": "go live sequence"}],
+  "successMetrics": ["Signups/Early Access", "Email Open Rate", "Social Engagement", "Launch Day Conversions"]
 }`
-    : `You are a SaaS launch strategist. Generate a STANDARD tier launch playbook.
-
-PRODUCT: ${formData.productName}
-AUDIENCE: ${formData.targetAudience}
-LAUNCH: ${daysUntilLaunch} days away
-
-CRITICAL REQUIREMENTS:
-- Return ONLY valid JSON with NO markdown code blocks
-- NO placeholders like "Post 1", "Email 1", etc
-- EVERY field must have REAL, specific, detailed content
-- Write 2-3 paragraphs for text fields
-- For arrays, provide 4-6 actual items with substance
-- Make content launch-ready and actionable
-
-Generate JSON:
+    : `Launch strategy for ${formData.productName} targeting ${formData.targetAudience}, launching in ${daysUntilLaunch} days. Return valid JSON only, no markdown:
 {
-  "executiveSummary": "3 detailed paragraphs: 1) Why launch now, 2) Target customer, 3) Success vision",
-  "targetMarket": "2 paragraphs with specific TAM, customer pain points, and buying signals",
-  "productPositioning": "2 paragraphs on value proposition and differentiation",
-  "pricePosition": "1 paragraph with pricing strategy and market positioning",
-  "emailSequence": ["Email 1 - Hook (Subject, 2-3 sentences)", "Email 2 - Feature benefit (Subject, 2-3 sentences)", "Email 3 - Social proof (Subject, 2-3 sentences)", "Email 4 - CTA (Subject, 2-3 sentences)"],
-  "socialContent": ["4 specific Twitter posts for launch (each 2 sentences)", "3 LinkedIn posts about the product (each 2 sentences)"],
-  "launch5DayPlan": ["Day 1: Specific actions", "Day 2: Specific actions", "Day 3: Specific actions", "Day 4: Specific actions", "Day 5: Launch day"],
-  "keyMetrics": ["Metric 1 with target", "Metric 2 with target", "Metric 3 with target"]
+  "executiveSummary": "3 sentences on why, audience, vision",
+  "targetMarket": "2-3 sentences on TAM and needs",
+  "emailSequence": [{"subject": "Awareness", "body": "2 sentences hook"}, {"subject": "Features", "body": "2 sentences benefit"}, {"subject": "CTA", "body": "2 sentences action"}],
+  "launch5DayPlan": [{"day": "Day 1", "actions": "prep"}, {"day": "Day 2", "actions": "setup"}, {"day": "Day 3", "actions": "warmup"}, {"day": "Day 4", "actions": "final"}, {"day": "Day 5", "actions": "launch"}],
+  "keyMetrics": ["Signups", "Engagement", "Conversions"]
 }`;
 
   try {
     console.log('[Gemini] Generating launch plan...');
     
-    // Add 40-second timeout to prevent Istio timeout (60s) and give buffer
+    // Add 50-second timeout to prevent Istio timeout (60s) and give buffer
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Gemini API request timeout after 40 seconds')), 40000)
+      setTimeout(() => reject(new Error('Gemini API request timeout after 50 seconds')), 50000)
     );
 
     const responsePromise = genAI.models.generateContent({
