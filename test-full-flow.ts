@@ -1,21 +1,15 @@
-#!/usr/bin/env node
-
 /**
  * Prueba completa: Gemini → PDF
  * Genera un PDF de prueba con los prompts simplificados
- * 
- * Uso: node --loader tsx test-full-flow.mjs
  */
 
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { generateLaunchPlanServer } from './services/geminiServerService.ts';
-import { generatePDFFromContent } from './services/pdfKitService.ts';
+import { generateLaunchPlanServer } from './services/geminiServerService';
+import { generatePDFFromContent } from './services/pdfKitService';
 import dotenv from 'dotenv';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, '.env.production') });
+dotenv.config({ path: '.env.production' });
 
 const testFormData = {
   productName: 'LaunchLoom Test Product',
@@ -51,7 +45,7 @@ const testProData = {
     
     console.log('\n3️⃣  Generando PDF...');
     const startPDF = Date.now();
-    const pdfBuffer = await generatePDFFromContent(standardJSON, 'Standard');
+    const pdfBuffer = await generatePDFFromContent(standardJSON, 'standard');
     const pdfTime = Date.now() - startPDF;
     console.log(`   ✅ PDF generado en ${pdfTime}ms`);
     console.log(`   Tamaño: ${(pdfBuffer.length / 1024).toFixed(2)} KB`);
@@ -81,7 +75,7 @@ const testProData = {
     
     console.log('\n3️⃣  Generando PDF...');
     const startPDFPro = Date.now();
-    const pdfProBuffer = await generatePDFFromContent(proJSON, 'Pro');
+    const pdfProBuffer = await generatePDFFromContent(proJSON, 'pro');
     const pdfProTime = Date.now() - startPDFPro;
     console.log(`   ✅ PDF generado en ${pdfProTime}ms`);
     console.log(`   Tamaño: ${(pdfProBuffer.length / 1024).toFixed(2)} KB`);

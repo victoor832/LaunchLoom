@@ -33,43 +33,57 @@ export const generateLaunchPlanServer = async (
     : '';
 
   const prompt = isPro 
-    ? `You are a SaaS launch strategist. Generate a PRO launch playbook.
+    ? `You are a SaaS launch strategist. Generate a COMPREHENSIVE PRO tier launch playbook.
 
 PRODUCT: ${formData.productName}
 AUDIENCE: ${formData.targetAudience}
 LAUNCH: ${daysUntilLaunch} days away
 
-CRITICAL: Return ONLY valid JSON with NO markdown code blocks. NO placeholders. Every field must have REAL, specific content.
+CRITICAL REQUIREMENTS:
+- Return ONLY valid JSON with NO markdown code blocks
+- NO placeholders like "Post 1", "Email 1", etc
+- EVERY field must have REAL, specific, detailed content
+- Write 2-4 paragraphs for text fields (not just 1 sentence)
+- For arrays, provide 6-10 actual items with substance
+- Make content launch-ready and actionable
 
-Generate JSON with these fields (required):
+Generate JSON:
 {
-  "executiveSummary": "2-3 paragraphs on launch strategy and market opportunity",
-  "competitorAnalysis": ["Competitor 1 with specific advantages", "Competitor 2 with specific advantages"],
-  "positioning": "1-2 paragraphs on unique value",
-  "pricingStrategy": "1 paragraph on pricing approach",
-  "emailSequences": ["Email 1: Subject and body", "Email 2: Subject and body", "Email 3: Subject and body", "Email 4: Subject and body"],
-  "twitterContent": ["Tweet 1", "Tweet 2", "Tweet 3", "Tweet 4", "Tweet 5", "Tweet 6"],
-  "linkedinContent": ["Post 1", "Post 2", "Post 3"],
-  "launchSchedule": ["Day 1 action", "Day 2 action", "Day 3 action", "Day 4 action", "Day 5 action"],
-  "metrics": ["Signup target", "Engagement target", "Conversion target"]
+  "executiveSummary": "4 detailed paragraphs: 1) Why launch now, 2) Target market opportunity, 3) Key differentiators vs competitors, 4) 90-day success vision",
+  "targetMarketAnalysis": "3 detailed paragraphs analyzing TAM, customer pain points, and buying signals",
+  "competitorAnalysis": ["Competitor 1 name: Specific strengths (2-3 sentences)", "Competitor 2: Specific strengths", "How ${formData.productName} wins: 3-4 sentences"],
+  "positioning": "3 paragraphs: 1) Value proposition, 2) Differentiation story, 3) Market positioning",
+  "pricingStrategy": "2 paragraphs with specific pricing tiers, rationale, and positioning",
+  "goToMarketChannels": ["Channel 1: Detailed strategy for reaching ${formData.targetAudience}", "Channel 2: Specific tactics", "Channel 3: Success metrics"],
+  "emailSequence": ["Email 1 - Awareness (Subject, 3-4 sentences content)", "Email 2 - Feature showcase (Subject, 3-4 sentences)", "Email 3 - Social proof (Subject, 3-4 sentences)", "Email 4 - Urgency/CTA (Subject, 3-4 sentences)", "Email 5 - Post-signup (Subject, 3-4 sentences)", "Email 6 - Re-engagement (Subject, 3-4 sentences)"],
+  "socialMediaStrategy": ["Twitter strategy with 8 specific launch posts (each 2-3 sentences)", "LinkedIn strategy with 4 thought leadership posts (each 2-3 sentences)", "TikTok/Instagram strategy if applicable"],
+  "launchTimeline": ["Day 1 (5 days pre-launch): Specific actions", "Day 2: Specific actions", "Day 3: Specific actions", "Day 4: Specific actions", "Day 5 (Day of): Launch day sequence", "Day 6: Post-launch momentum"],
+  "successMetrics": ["Metric 1 with target and tracking method", "Metric 2", "Metric 3", "Metric 4", "Metric 5"]
 }`
-    : `You are a SaaS launch strategist. Generate a STANDARD launch playbook.
+    : `You are a SaaS launch strategist. Generate a STANDARD tier launch playbook.
 
 PRODUCT: ${formData.productName}
 AUDIENCE: ${formData.targetAudience}
 LAUNCH: ${daysUntilLaunch} days away
 
-CRITICAL: Return ONLY valid JSON with NO markdown code blocks. NO placeholders. Every field must have REAL, specific content.
+CRITICAL REQUIREMENTS:
+- Return ONLY valid JSON with NO markdown code blocks
+- NO placeholders like "Post 1", "Email 1", etc
+- EVERY field must have REAL, specific, detailed content
+- Write 2-3 paragraphs for text fields
+- For arrays, provide 4-6 actual items with substance
+- Make content launch-ready and actionable
 
-Generate JSON with these fields (required):
+Generate JSON:
 {
-  "executiveSummary": "1-2 paragraphs on launch strategy",
-  "positioning": "1 paragraph on unique value",
-  "emailSequences": ["Email 1: Subject and body", "Email 2: Subject and body"],
-  "twitterContent": ["Tweet 1", "Tweet 2", "Tweet 3", "Tweet 4"],
-  "linkedinContent": ["Post 1", "Post 2"],
-  "launchSchedule": ["Day 1 action", "Day 2 action", "Day 3 action"],
-  "metrics": ["Signup target", "Engagement target"]
+  "executiveSummary": "3 detailed paragraphs: 1) Why launch now, 2) Target customer, 3) Success vision",
+  "targetMarket": "2 paragraphs with specific TAM, customer pain points, and buying signals",
+  "productPositioning": "2 paragraphs on value proposition and differentiation",
+  "pricePosition": "1 paragraph with pricing strategy and market positioning",
+  "emailSequence": ["Email 1 - Hook (Subject, 2-3 sentences)", "Email 2 - Feature benefit (Subject, 2-3 sentences)", "Email 3 - Social proof (Subject, 2-3 sentences)", "Email 4 - CTA (Subject, 2-3 sentences)"],
+  "socialContent": ["4 specific Twitter posts for launch (each 2 sentences)", "3 LinkedIn posts about the product (each 2 sentences)"],
+  "launch5DayPlan": ["Day 1: Specific actions", "Day 2: Specific actions", "Day 3: Specific actions", "Day 4: Specific actions", "Day 5: Launch day"],
+  "keyMetrics": ["Metric 1 with target", "Metric 2 with target", "Metric 3 with target"]
 }`;
 
   try {
