@@ -89,18 +89,17 @@ Generate JSON:
   try {
     console.log('[Gemini] Generating launch plan...');
     
-    // Add 45-second timeout to prevent Istio timeout (60s)
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Gemini API request timeout after 45 seconds')), 45000)
+    // Add 40-second timeout to prevent Istio timeout (60s) and give buffer
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Gemini API request timeout after 40 seconds')), 40000)
     );
 
-    const result = await Promise.race([
-      genAI.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      }),
-      timeoutPromise
-    ]) as any;
+    const responsePromise = genAI.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    });
+
+    const result = await Promise.race([responsePromise, timeoutPromise]) as any;
 
     const content = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
     
