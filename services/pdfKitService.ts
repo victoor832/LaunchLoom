@@ -172,7 +172,7 @@ function formatKeyName(key: string): string {
 
 /**
  * Parse AI-generated content into structured PDF sections
- * Maintains hierarchy: headings > subheadings > lists > content
+ * Handles both JSON and markdown, maximizing content display
  */
 function parseContentForPDF(content: string) {
   const sections: PDFSection[] = [];
@@ -183,10 +183,26 @@ function parseContentForPDF(content: string) {
     
     console.log(`[PDF] Parsed JSON with ${Object.keys(json).length} top-level keys`);
     
+    // Sort keys to put important sections first
+    const sortedKeys = Object.keys(json).sort((a, b) => {
+      const priority: {[key: string]: number} = {
+        'executiveSummary': 1,
+        'marketAnalysis': 2,
+        'targetAudience': 3,
+        'marketOpportunity': 4,
+        'productPositioning': 5,
+        'goToMarketStrategy': 6,
+        'competitorAnalysis': 7,
+        'budgetBreakdown': 8,
+      };
+      return (priority[a] || 100) - (priority[b] || 100);
+    });
+    
     // Process each field in the JSON object
-    Object.entries(json).forEach(([key, value]) => {
+    sortedKeys.forEach((key) => {
       if (!key || key === 'undefined' || key === 'null') return;
 
+      const value = json[key];
       const keyName = formatKeyName(key);
       
       // Add section header
@@ -197,23 +213,31 @@ function parseContentForPDF(content: string) {
 
       // Process the value based on its type
       if (typeof value === 'string' && value.trim()) {
-        // Simple string value
-        sections.push({
-          content: value.trim(),
+        // Split long strings into readable paragraphs
+        const paragraphs = value.split('\n\n').filter(p => p.trim());
+        paragraphs.forEach(para => {
+          if (para.trim()) {
+            sections.push({
+              content: para.trim(),
+            });
+          }
         });
       } else if (Array.isArray(value)) {
         // Array - render as bullet list
         if (value.length > 0) {
-          value.forEach((item) => {
+          value.forEach((item, idx) => {
             if (typeof item === 'string' && item.trim()) {
+              // Add item number for longer lists
+              const displayText = value.length > 5 ? `${idx + 1}. ${item.trim()}` : `• ${item.trim()}`;
               sections.push({
-                content: `• ${item.trim()}`,
+                content: displayText,
               });
             } else if (typeof item === 'object' && item !== null) {
-              // Object in array - stringify it
-              const str = Object.values(item)
-                .filter(v => typeof v === 'string' && v.trim())
-                .join(' - ');
+              // Object in array - stringify it nicely
+              const str = Object.entries(item)
+                .map(([k, v]) => `${formatKeyName(k)}: ${v}`)
+                .filter(s => s.length > 0)
+                .join(' | ');
               if (str) {
                 sections.push({
                   content: `• ${str}`,
@@ -223,18 +247,23 @@ function parseContentForPDF(content: string) {
           });
         }
       } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        // Nested object - add as subheadings
+        // Nested object - add as items
         Object.entries(value).forEach(([subKey, subValue]) => {
           if (subKey && subValue) {
-            sections.push({
-              title: formatKeyName(subKey),
-              isSubheading: true,
-            });
+            const subKeyName = formatKeyName(subKey);
             if (typeof subValue === 'string') {
+              sections.push({
+                title: subKeyName,
+                isSubheading: true,
+              });
               sections.push({
                 content: subValue.trim(),
               });
             } else if (Array.isArray(subValue)) {
+              sections.push({
+                title: subKeyName,
+                isSubheading: true,
+              });
               subValue.forEach((item) => {
                 if (typeof item === 'string' && item.trim()) {
                   sections.push({
@@ -257,7 +286,7 @@ function parseContentForPDF(content: string) {
     
     console.log(`[PDF] Created ${sections.length} sections from JSON`);
   } catch (jsonError) {
-    console.warn(`[PDF] JSON parsing failed, trying markdown format`);
+    console.warn(`[PDF] JSON parsing failed, trying markdown/text format`);
     
     // Fallback: treat as markdown or plain text
     const lines = content.split('\n');
@@ -274,7 +303,7 @@ function parseContentForPDF(content: string) {
         return;
       }
 
-      // Detect headings
+      // Detect headings - multiple styles
       if (trimmed.startsWith('# ')) {
         if (currentSection.title || currentSection.content) {
           sections.push(currentSection);
@@ -291,7 +320,7 @@ function parseContentForPDF(content: string) {
           title: trimmed.replace(/^#+\s*/, ''),
           isSubheading: true,
         };
-      } else if (trimmed.match(/^[\d•\-]\s/)) {
+      } else if (trimmed.match(/^[\d•\-\*]\s/)) {
         // List item
         if (currentSection.content) {
           currentSection.content += '\n' + trimmed;
@@ -315,4 +344,3 @@ function parseContentForPDF(content: string) {
 
   return { sections };
 }
-
