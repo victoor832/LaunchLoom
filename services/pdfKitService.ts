@@ -213,34 +213,54 @@ function parseContentForPDF(content: string) {
 
       // Process the value based on its type
       if (typeof value === 'string' && value.trim()) {
-        // Split long strings into readable paragraphs
-        const paragraphs = value.split('\n\n').filter(p => p.trim());
-        paragraphs.forEach(para => {
-          if (para.trim()) {
+        // Split long strings into readable paragraphs, but keep them compact
+        const paragraphs = value
+          .split('\n\n')
+          .map(p => p.trim())
+          .filter(p => p.length > 0);
+        
+        paragraphs.forEach((para) => {
+          // Don't add empty paragraphs or placeholder text
+          if (para && para !== '...' && para.length > 5) {
             sections.push({
-              content: para.trim(),
+              content: para,
             });
           }
         });
       } else if (Array.isArray(value)) {
-        // Array - render as bullet list
-        if (value.length > 0) {
-          value.forEach((item, idx) => {
+        // Array - render as bullet list, but filter out empty/placeholder items
+        const validItems = value
+          .filter(item => {
+            if (!item) return false;
+            if (typeof item === 'string') {
+              return item.trim().length > 0 && 
+                     item !== '...' && 
+                     !item.match(/^\.\.\./);
+            }
+            return true;
+          })
+          .slice(0, 50); // Limit to 50 items max per section
+        
+        if (validItems.length > 0) {
+          validItems.forEach((item, idx) => {
             if (typeof item === 'string' && item.trim()) {
-              // Add item number for longer lists
-              const displayText = value.length > 5 ? `${idx + 1}. ${item.trim()}` : `• ${item.trim()}`;
+              // Use numbered list for clarity
+              const num = idx + 1;
               sections.push({
-                content: displayText,
+                content: `${num}. ${item.trim().replace(/^[\d]+\.\s*/, '')}`,
               });
             } else if (typeof item === 'object' && item !== null) {
               // Object in array - stringify it nicely
               const str = Object.entries(item)
-                .map(([k, v]) => `${formatKeyName(k)}: ${v}`)
+                .map(([k, v]) => {
+                  const val = String(v).trim();
+                  return val && val !== '...' ? `${val}` : '';
+                })
                 .filter(s => s.length > 0)
                 .join(' | ');
-              if (str) {
+              if (str && str.length > 5) {
                 sections.push({
-                  content: `• ${str}`,
+                  content: `${idx + 1}. ${str}`,
                 });
               }
             }
@@ -251,7 +271,7 @@ function parseContentForPDF(content: string) {
         Object.entries(value).forEach(([subKey, subValue]) => {
           if (subKey && subValue) {
             const subKeyName = formatKeyName(subKey);
-            if (typeof subValue === 'string') {
+            if (typeof subValue === 'string' && subValue.trim()) {
               sections.push({
                 title: subKeyName,
                 isSubheading: true,
@@ -260,31 +280,51 @@ function parseContentForPDF(content: string) {
                 content: subValue.trim(),
               });
             } else if (Array.isArray(subValue)) {
-              sections.push({
-                title: subKeyName,
-                isSubheading: true,
-              });
-              subValue.forEach((item) => {
-                if (typeof item === 'string' && item.trim()) {
+              const validSub = subValue
+                .filter(v => typeof v === 'string' && v.trim().length > 0)
+                .slice(0, 20);
+              
+              if (validSub.length > 0) {
+                sections.push({
+                  title: subKeyName,
+                  isSubheading: true,
+                });
+                validSub.forEach((item, idx) => {
                   sections.push({
-                    content: `• ${item.trim()}`,
+                    content: `${idx + 1}. ${item.trim()}`,
                   });
-                }
-              });
+                });
+              }
             }
           }
         });
       }
 
-      // Add spacing after section
+      // Add spacing after section (but less than before)
       sections.push({ content: '' });
     });
     
-    if (sections.length === 0) {
+    // Filter out consecutive empty sections
+    const filtered: PDFSection[] = [];
+    let lastWasEmpty = false;
+    sections.forEach(section => {
+      if (!section.content && !section.title) {
+        if (!lastWasEmpty) {
+          filtered.push(section);
+          lastWasEmpty = true;
+        }
+      } else {
+        filtered.push(section);
+        lastWasEmpty = false;
+      }
+    });
+    
+    if (filtered.length === 0) {
       throw new Error('No content extracted from JSON');
     }
     
-    console.log(`[PDF] Created ${sections.length} sections from JSON`);
+    console.log(`[PDF] Created ${filtered.length} sections from JSON (filtered from ${sections.length})`);
+    return { sections: filtered };
   } catch (jsonError) {
     console.warn(`[PDF] JSON parsing failed, trying markdown/text format`);
     
