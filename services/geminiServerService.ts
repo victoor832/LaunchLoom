@@ -33,7 +33,9 @@ export const generateLaunchPlanServer = async (
     : '';
 
   const prompt = isPro 
-    ? `You are a world-class SaaS launch strategist. Generate a PRO+ TIER launch playbook in VALID JSON format.
+    ? `You are a world-class SaaS launch strategist. Generate a comprehensive PRO+ TIER launch playbook in VALID JSON format.
+
+CRITICAL: Return ONLY valid JSON, no markdown, no code blocks, no explanation.
 
 PRODUCT INFORMATION:
 - Name: ${formData.productName}
@@ -43,35 +45,61 @@ PRODUCT INFORMATION:
 - Channels: ${channels}
 - Competitor: ${proData?.mainCompetitor || 'auto-detect'}
 
-Generate comprehensive PRO+ content:
-- Executive Summary (tailored to their market position)
-- Competitor Analysis
-- Budget Breakdown
-- 12 personalized email sequences
-- 30 Twitter posts optimized for ${channels}
-- 10 LinkedIn posts
-- Product Hunt strategy
-- 30-day daily timeline
-- Success metrics
+Generate PRO+ content with this EXACT JSON structure:
+{
+  "executiveSummary": "2-3 paragraph summary of launch strategy",
+  "competitorAnalysis": ["Competitor 1 with strengths/weaknesses", "Competitor 2...", "Competitor 3..."],
+  "budgetBreakdown": ["Ads: X%", "Content: Y%", "Tools: Z%"],
+  "emailSequences": [
+    "Subject: Welcome - Body: ...",
+    "Subject: Feature highlight - Body: ...",
+    "Subject: Social proof - Body: ...",
+    "Subject: Urgency - Body: ...",
+    "Subject: Re-engagement - Body: ...",
+    "Subject: Final push - Body: ...",
+    "Subject: Post-launch followup - Body: ...",
+    "Subject: Case study - Body: ...",
+    "Subject: Best practices - Body: ...",
+    "Subject: Special offer - Body: ...",
+    "Subject: Partnership - Body: ...",
+    "Subject: Testimonial - Body: ..."
+  ],
+  "twitterPosts": ["Post 1", "Post 2", "Post 3", ...30 posts],
+  "linkedInPosts": ["Post 1", "Post 2", "Post 3", ...10 posts],
+  "productHuntStrategy": ["Preparation step 1", "Preparation step 2", "Day-of strategy", "Post-launch"],
+  "dailyTimeline": ["Day 1: ...", "Day 2: ...", ...30 days],
+  "successMetrics": ["Metric 1: Target X", "Metric 2: Target Y", "Metric 3: Target Z"]
+}`
+    : `You are a professional SaaS launch strategist. Generate a comprehensive STANDARD TIER launch playbook in VALID JSON format.
 
-Return ONLY valid JSON with ALL fields populated. No markdown, no explanation.`
-    : `You are a professional SaaS launch strategist. Generate a STANDARD TIER launch playbook in VALID JSON format.
+CRITICAL: Return ONLY valid JSON, no markdown, no code blocks, no explanation.
 
 PRODUCT INFORMATION:
 - Name: ${formData.productName}
 - Target Audience: ${formData.targetAudience}
 - Days Until Launch: ${daysUntilLaunch}
 
-Generate comprehensive STANDARD content:
-- Executive Summary
-- Go-to-Market Strategy (top 3 channels)
-- 10 email templates (copy/paste ready)
-- 25 Twitter posts (full month coverage)
-- 8 LinkedIn posts (professional)
-- 7-day action timeline
-- Success metrics
-
-Return ONLY valid JSON with ALL fields populated. No markdown, no explanation.`;
+Generate STANDARD content with this EXACT JSON structure:
+{
+  "executiveSummary": "2-3 paragraph launch strategy overview",
+  "goToMarketStrategy": ["Channel 1: Description", "Channel 2: Description", "Channel 3: Description"],
+  "emailTemplates": [
+    "Subject: Welcome to [Product] - Body: ...",
+    "Subject: How [Product] works - Body: ...",
+    "Subject: Customer success story - Body: ...",
+    "Subject: Limited time offer - Body: ...",
+    "Subject: Why [Competitor] users switch - Body: ...",
+    "Subject: Your personalized demo - Body: ...",
+    "Subject: Join [N] users - Body: ...",
+    "Subject: Final launch day - Body: ...",
+    "Subject: Thank you - Body: ...",
+    "Subject: Next steps - Body: ..."
+  ],
+  "twitterPosts": ["Post 1", "Post 2", "Post 3", ...25 posts],
+  "linkedInPosts": ["Post 1", "Post 2", "Post 3", ...8 posts],
+  "actionTimeline": ["Day 1: ...", "Day 2: ...", "Day 3: ...", "Day 4: ...", "Day 5: ...", "Day 6: ...", "Day 7: ..."],
+  "successMetrics": ["Users: X", "Signups: Y", "Revenue: Z"]
+}`;
 
   try {
     console.log('[Gemini] Generating launch plan...');

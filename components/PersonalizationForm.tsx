@@ -130,36 +130,48 @@ const PersonalizationForm: React.FC = () => {
       }
       
       // Retry logic for timeout issues
+      // The Northflank proxy has a 60s timeout, so we need multiple retries
       let response;
       let retries = 0;
-      const maxRetries = 3;
-      const retryDelay = 2000; // 2 seconds
+      const maxRetries = 5; // More retries for Istio timeout
+      const retryDelays = [1000, 2000, 3000, 5000, 10000]; // Increasing delays
       
       while (retries < maxRetries) {
         try {
+          console.log(`[Form] Attempt ${retries + 1}/${maxRetries}: Calling API with 180s timeout...`);
+          setGenerationProgress(`Generando... (intento ${retries + 1}/${maxRetries})`);
+          
           response = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody),
-            signal: AbortSignal.timeout(90000), // 90 second timeout
+            signal: AbortSignal.timeout(180000), // 180 second timeout (3 minutes) - much longer than Istio's 60s
           });
           
           if (response.ok) {
+            console.log(`[Form] ✓ Success on attempt ${retries + 1}`);
             break; // Success, exit retry loop
           }
           
+          const statusText = response.statusText || 'Unknown error';
+          console.log(`[Form] Request failed with status ${response.status}: ${statusText}`);
+          
           retries++;
           if (retries < maxRetries) {
-            console.log(`[Form] Request failed, retrying in ${retryDelay}ms... (attempt ${retries + 1}/${maxRetries})`);
-            setGenerationProgress(`Reintentando... (${retries}/${maxRetries})`);
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            const delay = retryDelays[Math.min(retries - 1, retryDelays.length - 1)];
+            console.log(`[Form] Retrying in ${delay}ms... (attempt ${retries + 1}/${maxRetries})`);
+            setGenerationProgress(`Reintentando en ${delay / 1000}s... (${retries}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
           }
         } catch (error) {
+          console.log(`[Form] Request error on attempt ${retries + 1}:`, error instanceof Error ? error.message : error);
+          
           retries++;
           if (retries < maxRetries) {
-            console.log(`[Form] Request error, retrying in ${retryDelay}ms...`, error);
-            setGenerationProgress(`Reintentando... (${retries}/${maxRetries})`);
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            const delay = retryDelays[Math.min(retries - 1, retryDelays.length - 1)];
+            console.log(`[Form] Retrying in ${delay}ms...`);
+            setGenerationProgress(`Reintentando en ${delay / 1000}s... (${retries}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
           } else {
             throw error;
           }

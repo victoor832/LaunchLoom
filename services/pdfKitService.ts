@@ -181,67 +181,101 @@ function parseContentForPDF(content: string) {
     // Try to parse as JSON first
     const json = JSON.parse(content);
     
-    // Flatten and process JSON into sections
-    const processValue = (value: any, keyName: string, isTopLevel: boolean): void => {
-      if (keyName && keyName !== 'undefined' && keyName !== 'null') {
-        // Add section title
-        sections.push({
-          title: keyName,
-          isHeading: isTopLevel,
-          isSubheading: !isTopLevel,
-        });
-      }
+    console.log(`[PDF] Parsed JSON with ${Object.keys(json).length} top-level keys`);
+    
+    // Process each field in the JSON object
+    Object.entries(json).forEach(([key, value]) => {
+      if (!key || key === 'undefined' || key === 'null') return;
 
+      const keyName = formatKeyName(key);
+      
+      // Add section header
+      sections.push({
+        title: keyName,
+        isHeading: true,
+      });
+
+      // Process the value based on its type
       if (typeof value === 'string' && value.trim()) {
-        sections.push({ content: value.trim() });
+        // Simple string value
+        sections.push({
+          content: value.trim(),
+        });
       } else if (Array.isArray(value)) {
-        // Process array items
-        value.forEach((item) => {
-          if (typeof item === 'string') {
-            sections.push({ content: `• ${item}` });
-          } else if (typeof item === 'object' && item !== null) {
-            const texts: string[] = [];
-            Object.values(item).forEach((v) => {
-              if (typeof v === 'string' && v.trim()) {
-                texts.push(v);
+        // Array - render as bullet list
+        if (value.length > 0) {
+          value.forEach((item) => {
+            if (typeof item === 'string' && item.trim()) {
+              sections.push({
+                content: `• ${item.trim()}`,
+              });
+            } else if (typeof item === 'object' && item !== null) {
+              // Object in array - stringify it
+              const str = Object.values(item)
+                .filter(v => typeof v === 'string' && v.trim())
+                .join(' - ');
+              if (str) {
+                sections.push({
+                  content: `• ${str}`,
+                });
               }
+            }
+          });
+        }
+      } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        // Nested object - add as subheadings
+        Object.entries(value).forEach(([subKey, subValue]) => {
+          if (subKey && subValue) {
+            sections.push({
+              title: formatKeyName(subKey),
+              isSubheading: true,
             });
-            if (texts.length > 0) {
-              sections.push({ content: `• ${texts.join(' — ')}` });
+            if (typeof subValue === 'string') {
+              sections.push({
+                content: subValue.trim(),
+              });
+            } else if (Array.isArray(subValue)) {
+              subValue.forEach((item) => {
+                if (typeof item === 'string' && item.trim()) {
+                  sections.push({
+                    content: `• ${item.trim()}`,
+                  });
+                }
+              });
             }
           }
         });
-      } else if (typeof value === 'object' && value !== null) {
-        // Process nested object
-        Object.entries(value).forEach(([k, v]) => {
-          if (k && k !== 'undefined' && k !== 'null') {
-            processValue(v, formatKeyName(k), false);
-          }
-        });
       }
-    };
 
-    // Start processing from top level
-    Object.entries(json).forEach(([key, value]) => {
-      processValue(value, formatKeyName(key), true);
-      sections.push({ content: '' }); // Add spacing
+      // Add spacing after section
+      sections.push({ content: '' });
     });
     
     if (sections.length === 0) {
       throw new Error('No content extracted from JSON');
     }
+    
+    console.log(`[PDF] Created ${sections.length} sections from JSON`);
   } catch (jsonError) {
-    // If not JSON, treat as markdown or plain text
+    console.warn(`[PDF] JSON parsing failed, trying markdown format`);
+    
+    // Fallback: treat as markdown or plain text
     const lines = content.split('\n');
     let currentSection: PDFSection = {};
 
     lines.forEach((line) => {
       const trimmed = line.trim();
 
-      if (!trimmed) return;
+      if (!trimmed) {
+        if (currentSection.content || currentSection.title) {
+          sections.push(currentSection);
+          currentSection = {};
+        }
+        return;
+      }
 
       // Detect headings
-      if (trimmed.startsWith('##')) {
+      if (trimmed.startsWith('# ')) {
         if (currentSection.title || currentSection.content) {
           sections.push(currentSection);
         }
@@ -249,24 +283,23 @@ function parseContentForPDF(content: string) {
           title: trimmed.replace(/^#+\s*/, ''),
           isHeading: true,
         };
-      } else if (trimmed.match(/^#{1,2}\s/)) {
+      } else if (trimmed.startsWith('## ')) {
         if (currentSection.title || currentSection.content) {
           sections.push(currentSection);
         }
         currentSection = {
           title: trimmed.replace(/^#+\s*/, ''),
-          isHeading: trimmed.startsWith('##'),
-          isSubheading: !trimmed.startsWith('##'),
+          isSubheading: true,
         };
-      } else if (trimmed.match(/^\d+\.\s/) || trimmed.match(/^-\s/)) {
-        // Bullet point
+      } else if (trimmed.match(/^[\d•\-]\s/)) {
+        // List item
         if (currentSection.content) {
           currentSection.content += '\n' + trimmed;
         } else {
           currentSection.content = trimmed;
         }
       } else {
-        // Regular content
+        // Regular text
         if (currentSection.content) {
           currentSection.content += '\n' + trimmed;
         } else {
@@ -282,3 +315,4 @@ function parseContentForPDF(content: string) {
 
   return { sections };
 }
+
