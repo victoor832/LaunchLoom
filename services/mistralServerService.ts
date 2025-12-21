@@ -91,16 +91,10 @@ Return ONLY valid JSON, no markdown or explanation:
       ]
     });
 
-    const result = await Promise.race([responsePromise, timeoutPromise]) as any;
+    const result = (await Promise.race([responsePromise, timeoutPromise])) as any;
 
-    // Extract content from streaming response
-    let content = '';
-    for await (const chunk of result) {
-      const chunkContent = chunk.choices?.[0]?.delta?.content;
-      if (chunkContent) {
-        content += chunkContent;
-      }
-    }
+    // Extract content from the response
+    const content = result.choices?.[0]?.message?.content || '';
     
     if (!content) {
       throw new Error('No content generated from Mistral API');
