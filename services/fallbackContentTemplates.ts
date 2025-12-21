@@ -8,6 +8,10 @@ export function generateFallbackContent(
   tier: 'standard' | 'pro'
 ): string {
   const isProTier = tier === 'pro';
+  return isProTier
+    ? generateProContent(productName, targetAudience)
+    : generateStandardContent(productName, targetAudience);
+}
 
 function generateStandardContent(productName: string, targetAudience: string): string {
   const jsonObj = {
@@ -77,7 +81,7 @@ function generateStandardContent(productName: string, targetAudience: string): s
     ]
   };
 
-  return JSON.stringify(json);
+  return JSON.stringify(jsonObj);
 }
 
 function generateProContent(productName: string, targetAudience: string): string {

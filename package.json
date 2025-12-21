@@ -11,7 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.33.0",
+    "@openrouter/sdk": "^0.3.10",
     "@vercel/analytics": "^1.6.1",
     "cors": "^2.8.5",
     "docx": "^9.5.1",

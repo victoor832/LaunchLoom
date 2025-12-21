@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import express, { Request, Response } from 'express';
-import { generateLaunchPlanServer } from './services/geminiServerService';
+import { generateLaunchPlanServer } from './services/mistralServerService';
 import { generatePDFFromContent } from './services/pdfKitService';
 import cors from 'cors';
 import { createReadStream, existsSync } from 'fs';
